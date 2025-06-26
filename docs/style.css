@@ -326,6 +326,18 @@ body {
   margin: 0 auto;
 }
 
+/* Result Info */
+.result-info {
+  text-align: center;
+  margin: 16px 0;
+}
+
+.result-hint {
+  font-size: 13px;
+  color: hsl(var(--muted-foreground));
+  font-style: italic;
+}
+
 /* Result Controls */
 .result-controls {
   display: flex;
