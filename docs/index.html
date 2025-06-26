@@ -14,7 +14,7 @@
         <header class="header">
             <div class="header-content">
                 <h1 class="title">Commit Flipbook</h1>
-                <p class="subtitle">Visualize code output evolution through commit history</p>
+                <p class="subtitle">Visualize how your code changes through commit history</p>
             </div>
         </header>
 
@@ -42,6 +42,10 @@
                         <summary class="options-toggle">Options</summary>
                         <div class="options-grid">
                             <div class="form-field">
+                                <label for="file-path" class="label">File Path</label>
+                                <input type="text" id="file-path" class="input input-small" placeholder="src/index.js">
+                            </div>
+                            <div class="form-field">
                                 <label for="branch" class="label">Branch</label>
                                 <input type="text" id="branch" class="input input-small" value="main">
                             </div>
@@ -50,17 +54,8 @@
                                 <input type="number" id="limit" class="input input-small" value="20" min="1" max="100">
                             </div>
                             <div class="form-field">
-                                <label for="type" class="label">Type</label>
-                                <select id="type" class="select">
-                                    <option value="auto">Auto</option>
-                                    <option value="web">Web</option>
-                                    <option value="console">Console</option>
-                                    <option value="canvas">Canvas</option>
-                                </select>
-                            </div>
-                            <div class="form-field">
                                 <label for="delay" class="label">Delay (ms)</label>
-                                <input type="number" id="delay" class="input input-small" value="1000" min="100" max="5000" step="100">
+                                <input type="number" id="delay" class="input input-small" value="500" min="100" max="2000" step="100">
                             </div>
                         </div>
                     </details>
@@ -75,9 +70,10 @@
 
                 <div id="result" class="result" style="display: none;">
                     <div class="result-content">
-                        <img id="result-gif" src="" alt="Generated flipbook" class="result-image">
+                        <canvas id="result-canvas" class="result-canvas"></canvas>
                         <div class="result-actions">
-                            <button class="button button-secondary" id="download-btn">Download</button>
+                            <button class="button button-secondary" id="play-btn">Play</button>
+                            <button class="button button-secondary" id="download-btn">Download GIF</button>
                             <button class="button button-secondary" id="share-btn">Share</button>
                         </div>
                     </div>
@@ -88,34 +84,24 @@
                 </div>
             </section>
 
-            <section class="examples-section">
-                <h2 class="section-title">Examples</h2>
-                <div class="examples-grid">
-                    <button class="example-card" data-repo="https://github.com/twalichiewicz/commit-flipbook/tree/main/examples/countdown-timer">
-                        <h3 class="example-title">Countdown Timer</h3>
-                        <p class="example-description">Web animation with progressive effects</p>
-                    </button>
-                    
-                    <button class="example-card" data-repo="https://github.com/twalichiewicz/commit-flipbook/tree/main/examples/progress-bar">
-                        <h3 class="example-title">Progress Bar</h3>
-                        <p class="example-description">Console ASCII visualization</p>
-                    </button>
-                    
-                    <button class="example-card" data-repo="https://github.com/twalichiewicz/commit-flipbook/tree/main/examples/spiral-art">
-                        <h3 class="example-title">Spiral Art</h3>
-                        <p class="example-description">Canvas generative art evolution</p>
-                    </button>
-                </div>
-            </section>
-
-            <section class="steps-section">
+            <section class="how-section">
                 <h2 class="section-title">How it works</h2>
-                <ol class="steps-list">
-                    <li class="step">Clone repository and fetch commit history</li>
-                    <li class="step">Check out each commit sequentially</li>
-                    <li class="step">Execute code and capture output</li>
-                    <li class="step">Generate animated GIF from frames</li>
-                </ol>
+                <p class="section-description">This tool uses the GitHub API to fetch your repository's commit history and visualize how specific files change over time. No server needed - everything runs in your browser!</p>
+                
+                <div class="features">
+                    <div class="feature">
+                        <h3 class="feature-title">Choose a file</h3>
+                        <p class="feature-description">Track how any file in your repository evolves</p>
+                    </div>
+                    <div class="feature">
+                        <h3 class="feature-title">See the changes</h3>
+                        <p class="feature-description">Watch code transform through each commit</p>
+                    </div>
+                    <div class="feature">
+                        <h3 class="feature-title">Share the story</h3>
+                        <p class="feature-description">Export as GIF to share your code's journey</p>
+                    </div>
+                </div>
             </section>
         </main>
 
@@ -123,13 +109,19 @@
             <div class="footer-content">
                 <div class="footer-links">
                     <a href="https://github.com/twalichiewicz/commit-flipbook" class="footer-link">GitHub</a>
-                    <a href="https://github.com/twalichiewicz/commit-flipbook#api" class="footer-link">API</a>
                     <a href="https://github.com/twalichiewicz/commit-flipbook/issues" class="footer-link">Issues</a>
                 </div>
             </div>
         </footer>
     </div>
 
-    <script src="script.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-jsx.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-typescript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-css.min.js"></script>
+    <script src="client-flipbook.js"></script>
 </body>
 </html>
