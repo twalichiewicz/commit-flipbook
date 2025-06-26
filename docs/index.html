@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Commit Flipbook - Visualize Your Code Evolution</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎬 Commit Flipbook</h1>
+            <p class="tagline">Transform your GitHub commit history into animated GIFs showing how your code output evolves</p>
+        </header>
+
+        <main>
+            <section class="hero">
+                <div class="form-container">
+                    <form id="flipbook-form">
+                        <div class="input-group">
+                            <input 
+                                type="url" 
+                                id="repo-url" 
+                                placeholder="https://github.com/username/repository" 
+                                required
+                                pattern="https://github\.com/[^/]+/[^/]+"
+                            >
+                            <button type="submit" id="generate-btn">
+                                <span class="btn-text">Generate Flipbook</span>
+                                <span class="btn-loader" style="display: none;">
+                                    <svg class="spinner" width="20" height="20" viewBox="0 0 24 24">
+                                        <circle class="spinner-circle" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" fill="none"></circle>
+                                    </svg>
+                                </span>
+                            </button>
+                        </div>
+                        
+                        <details class="options">
+                            <summary>Advanced Options</summary>
+                            <div class="options-grid">
+                                <div class="option">
+                                    <label for="branch">Branch</label>
+                                    <input type="text" id="branch" value="main" placeholder="main">
+                                </div>
+                                <div class="option">
+                                    <label for="limit">Max Commits</label>
+                                    <input type="number" id="limit" value="20" min="1" max="100">
+                                </div>
+                                <div class="option">
+                                    <label for="type">Project Type</label>
+                                    <select id="type">
+                                        <option value="auto">Auto Detect</option>
+                                        <option value="web">Web Page</option>
+                                        <option value="console">Console App</option>
+                                        <option value="canvas">Canvas/Art</option>
+                                    </select>
+                                </div>
+                                <div class="option">
+                                    <label for="delay">Frame Delay (ms)</label>
+                                    <input type="number" id="delay" value="1000" min="100" max="5000" step="100">
+                                </div>
+                            </div>
+                        </details>
+                    </form>
+                </div>
+
+                <div id="status" class="status" style="display: none;">
+                    <div class="status-message"></div>
+                    <div class="progress-bar">
+                        <div class="progress-fill"></div>
+                    </div>
+                </div>
+
+                <div id="result" class="result" style="display: none;">
+                    <h3>Your Flipbook is Ready!</h3>
+                    <div class="gif-preview">
+                        <img id="result-gif" src="" alt="Generated flipbook">
+                    </div>
+                    <div class="result-actions">
+                        <button class="download-btn" id="download-btn">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                            </svg>
+                            Download GIF
+                        </button>
+                        <button class="share-btn" id="share-btn">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="18" cy="5" r="3"></circle>
+                                <circle cx="6" cy="12" r="3"></circle>
+                                <circle cx="18" cy="19" r="3"></circle>
+                                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+                            </svg>
+                            Share
+                        </button>
+                    </div>
+                </div>
+
+                <div id="error" class="error" style="display: none;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                    <span class="error-message"></span>
+                </div>
+            </section>
+
+            <section class="examples">
+                <h2>Examples</h2>
+                <div class="example-grid">
+                    <div class="example-card" data-repo="https://github.com/yourusername/countdown-timer">
+                        <div class="example-preview">
+                            <img src="examples/countdown-preview.gif" alt="Countdown timer example">
+                        </div>
+                        <h3>Countdown Timer</h3>
+                        <p>Web animation showing a countdown with progressive effects</p>
+                        <button class="try-example">Try This Example</button>
+                    </div>
+                    
+                    <div class="example-card" data-repo="https://github.com/yourusername/progress-bar">
+                        <div class="example-preview">
+                            <img src="examples/progress-preview.gif" alt="Progress bar example">
+                        </div>
+                        <h3>Progress Bar</h3>
+                        <p>Console app with ASCII progress visualization</p>
+                        <button class="try-example">Try This Example</button>
+                    </div>
+                    
+                    <div class="example-card" data-repo="https://github.com/yourusername/spiral-art">
+                        <div class="example-preview">
+                            <img src="examples/spiral-preview.gif" alt="Spiral art example">
+                        </div>
+                        <h3>Spiral Art</h3>
+                        <p>Canvas-based generative art evolution</p>
+                        <button class="try-example">Try This Example</button>
+                    </div>
+                </div>
+            </section>
+
+            <section class="how-it-works">
+                <h2>How It Works</h2>
+                <div class="steps">
+                    <div class="step">
+                        <div class="step-number">1</div>
+                        <h3>Clone Repository</h3>
+                        <p>We fetch your repository and its complete commit history</p>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">2</div>
+                        <h3>Time Travel</h3>
+                        <p>Check out each commit in chronological order</p>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">3</div>
+                        <h3>Execute Code</h3>
+                        <p>Run your code and capture the actual output</p>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">4</div>
+                        <h3>Create Animation</h3>
+                        <p>Combine frames into a smooth GIF animation</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>Made with ❤️ by the open source community</p>
+            <div class="footer-links">
+                <a href="https://github.com/yourusername/commit-flipbook">GitHub</a>
+                <a href="https://github.com/yourusername/commit-flipbook#api">API</a>
+                <a href="https://github.com/yourusername/commit-flipbook/issues">Report Issue</a>
+            </div>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
