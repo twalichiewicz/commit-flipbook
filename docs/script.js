@@ -10,7 +10,7 @@ const statusDiv = document.getElementById('status');
 const resultDiv = document.getElementById('result');
 const errorDiv = document.getElementById('error');
 const statusMessage = document.querySelector('.status-message');
-const progressFill = document.querySelector('.progress-fill');
+const progressFill = document.querySelector('.progress-bar');
 const resultGif = document.getElementById('result-gif');
 const downloadBtn = document.getElementById('download-btn');
 const shareBtn = document.getElementById('share-btn');
@@ -30,8 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Handle example clicks
     exampleCards.forEach(card => {
-        const button = card.querySelector('.try-example');
-        button.addEventListener('click', () => {
+        card.addEventListener('click', () => {
             const repoUrl = card.dataset.repo;
             repoUrlInput.value = repoUrl;
             form.dispatchEvent(new Event('submit'));
@@ -185,8 +184,8 @@ function hideAll() {
 
 function setLoadingState(loading) {
     generateBtn.disabled = loading;
-    document.querySelector('.btn-text').style.display = loading ? 'none' : 'inline';
-    document.querySelector('.btn-loader').style.display = loading ? 'inline-flex' : 'none';
+    document.querySelector('.button-text').style.display = loading ? 'none' : 'inline';
+    document.querySelector('.button-loader').style.display = loading ? 'inline-flex' : 'none';
 }
 
 function isValidGitHubUrl(url) {
@@ -227,16 +226,7 @@ async function handleShare() {
             const originalText = shareBtn.textContent;
             shareBtn.textContent = 'Link Copied!';
             setTimeout(() => {
-                shareBtn.innerHTML = `
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="18" cy="5" r="3"></circle>
-                        <circle cx="6" cy="12" r="3"></circle>
-                        <circle cx="18" cy="19" r="3"></circle>
-                        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-                        <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
-                    </svg>
-                    Share
-                `;
+                shareBtn.textContent = 'Share';
             }, 2000);
         });
     }
