@@ -1,5 +1,5 @@
 // Generative Art from GitHub Commits
-// Creates beautiful visualizations from repository commit history
+// Creates dynamic visualizations from repository evolution
 
 class CommitArtGenerator {
     constructor() {
@@ -20,6 +20,10 @@ class CommitArtGenerator {
         this.animationId = null;
         this.lastFrameTime = 0;
         
+        // Particle system for dynamic effects
+        this.particles = [];
+        this.flowField = [];
+        
         this.init();
     }
     
@@ -31,7 +35,7 @@ class CommitArtGenerator {
         // Event listeners
         this.form.addEventListener('submit', (e) => this.handleSubmit(e));
         this.playBtn.addEventListener('click', () => this.togglePlayback());
-        this.speedSlider.addEventListener('input', () => this.updateSpeed());
+        this.speedSlider.addEventListener('input', () => this.updateSpeedDisplay());
         document.getElementById('download-btn').addEventListener('click', () => this.downloadGIF());
         document.getElementById('share-btn').addEventListener('click', () => this.share());
         
@@ -42,6 +46,9 @@ class CommitArtGenerator {
                 this.form.dispatchEvent(new Event('submit'));
             });
         });
+        
+        // Initialize speed display
+        this.updateSpeedDisplay();
     }
     
     async handleSubmit(e) {
@@ -57,23 +64,42 @@ class CommitArtGenerator {
             // Fetch repository info
             const repoInfo = await this.fetchRepoInfo(owner, repo);
             
-            // Fetch commits
+            // Fetch commits with more detail
             this.showStatus('Loading commit history...');
-            const commits = await this.fetchCommits(owner, repo, 50); // Get 50 commits for good animation
+            const commits = await this.fetchCommitsWithStats(owner, repo, 30);
             
             if (commits.length === 0) {
                 throw new Error('No commits found');
             }
             
+            // Analyze repository patterns
+            const analysis = this.analyzeRepository(commits);
+            
             // Generate art frames
             this.frames = [];
-            const totalCommits = commits.length;
             
-            for (let i = 0; i < totalCommits; i++) {
-                this.showStatus(`Creating art... ${i + 1}/${totalCommits}`);
-                this.updateProgress((i + 1) / totalCommits * 100);
+            // Create frames showing evolution
+            for (let i = 0; i < commits.length; i++) {
+                this.showStatus(`Creating visualization... ${i + 1}/${commits.length}`);
+                this.updateProgress((i + 1) / commits.length * 100);
                 
-                const frame = this.createArtFrame(commits.slice(0, i + 1), repoInfo);
+                const frame = await this.createArtFrame(
+                    commits.slice(0, i + 1), 
+                    repoInfo,
+                    analysis,
+                    i / commits.length
+                );
+                this.frames.push(frame);
+            }
+            
+            // Add some extra frames for smooth loop
+            for (let i = 0; i < 5; i++) {
+                const frame = await this.createArtFrame(
+                    commits, 
+                    repoInfo,
+                    analysis,
+                    1 + (i * 0.1)
+                );
                 this.frames.push(frame);
             }
             
@@ -100,110 +126,324 @@ class CommitArtGenerator {
         return await response.json();
     }
     
-    async fetchCommits(owner, repo, limit = 50) {
-        const response = await fetch(
+    async fetchCommitsWithStats(owner, repo, limit = 30) {
+        // First get commits
+        const commitsResponse = await fetch(
             `https://api.github.com/repos/${owner}/${repo}/commits?per_page=${limit}`
         );
-        if (!response.ok) throw new Error('Failed to fetch commits');
-        const commits = await response.json();
-        return commits.reverse(); // Oldest first
+        if (!commitsResponse.ok) throw new Error('Failed to fetch commits');
+        const commits = await commitsResponse.json();
+        
+        // Get additional stats for visualization
+        const detailedCommits = [];
+        for (let i = 0; i < Math.min(commits.length, 10); i++) {
+            try {
+                const statsResponse = await fetch(
+                    `https://api.github.com/repos/${owner}/${repo}/commits/${commits[i].sha}`
+                );
+                if (statsResponse.ok) {
+                    const detailed = await statsResponse.json();
+                    detailedCommits.push({
+                        ...commits[i],
+                        stats: detailed.stats,
+                        files: detailed.files?.length || 0
+                    });
+                } else {
+                    detailedCommits.push(commits[i]);
+                }
+            } catch {
+                detailedCommits.push(commits[i]);
+            }
+        }
+        
+        // Add remaining commits without detailed stats
+        for (let i = 10; i < commits.length; i++) {
+            detailedCommits.push(commits[i]);
+        }
+        
+        return detailedCommits.reverse(); // Oldest first
     }
     
-    createArtFrame(commits, repoInfo) {
+    analyzeRepository(commits) {
+        // Analyze patterns in the repository
+        const authors = new Map();
+        let maxChanges = 0;
+        let totalChanges = 0;
+        
+        commits.forEach(commit => {
+            const author = commit.commit.author.email;
+            authors.set(author, (authors.get(author) || 0) + 1);
+            
+            const changes = (commit.stats?.additions || 0) + (commit.stats?.deletions || 0);
+            maxChanges = Math.max(maxChanges, changes);
+            totalChanges += changes;
+        });
+        
+        return {
+            authors: Array.from(authors.keys()),
+            authorColors: this.generateAuthorColors(authors),
+            maxChanges,
+            avgChanges: totalChanges / commits.length,
+            totalCommits: commits.length
+        };
+    }
+    
+    generateAuthorColors(authors) {
+        const colors = new Map();
+        const authorList = Array.from(authors.keys());
+        
+        authorList.forEach((author, index) => {
+            const hue = (index * 360 / authorList.length) % 360;
+            colors.set(author, hue);
+        });
+        
+        return colors;
+    }
+    
+    async createArtFrame(commits, repoInfo, analysis, progress) {
         // Create offscreen canvas
         const frameCanvas = document.createElement('canvas');
         frameCanvas.width = this.canvas.width;
         frameCanvas.height = this.canvas.height;
         const ctx = frameCanvas.getContext('2d');
         
-        // Background
-        ctx.fillStyle = '#000';
+        // Dark background with subtle gradient
+        const bgGradient = ctx.createRadialGradient(
+            frameCanvas.width / 2, frameCanvas.height / 2, 0,
+            frameCanvas.width / 2, frameCanvas.height / 2, frameCanvas.width / 2
+        );
+        bgGradient.addColorStop(0, '#0a0a0a');
+        bgGradient.addColorStop(1, '#000000');
+        ctx.fillStyle = bgGradient;
         ctx.fillRect(0, 0, frameCanvas.width, frameCanvas.height);
         
-        // Create generative art based on commits
-        const centerX = frameCanvas.width / 2;
-        const centerY = frameCanvas.height / 2;
+        // Create flow field visualization
+        this.renderFlowField(ctx, commits, analysis, progress);
         
-        // Draw organic growth pattern
-        commits.forEach((commit, index) => {
-            const progress = index / commits.length;
-            const angle = index * 0.618033988749895 * Math.PI * 2; // Golden ratio
-            const radius = Math.sqrt(index) * 15;
-            
-            // Position based on spiral
-            const x = centerX + Math.cos(angle) * radius;
-            const y = centerY + Math.sin(angle) * radius;
-            
-            // Size based on commit impact
-            const additions = commit.stats?.additions || 0;
-            const deletions = commit.stats?.deletions || 0;
-            const changes = additions + deletions;
-            const size = Math.min(Math.sqrt(changes) * 2 + 3, 30);
-            
-            // Color based on author and time
-            const authorHash = this.hashCode(commit.commit.author.email);
-            const hue = (authorHash % 360);
-            const saturation = 50 + (progress * 50);
-            const lightness = 20 + (progress * 40);
-            
-            // Draw connection lines
-            if (index > 0) {
-                const prevCommit = commits[index - 1];
-                const prevAngle = (index - 1) * 0.618033988749895 * Math.PI * 2;
-                const prevRadius = Math.sqrt(index - 1) * 15;
-                const prevX = centerX + Math.cos(prevAngle) * prevRadius;
-                const prevY = centerY + Math.sin(prevAngle) * prevRadius;
-                
-                ctx.strokeStyle = `hsla(${hue}, ${saturation}%, ${lightness}%, 0.2)`;
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.moveTo(prevX, prevY);
-                ctx.lineTo(x, y);
-                ctx.stroke();
-            }
-            
-            // Draw commit node
-            ctx.fillStyle = `hsla(${hue}, ${saturation}%, ${lightness}%, 0.8)`;
-            ctx.beginPath();
-            ctx.arc(x, y, size, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Add glow effect
-            const gradient = ctx.createRadialGradient(x, y, 0, x, y, size * 2);
-            gradient.addColorStop(0, `hsla(${hue}, ${saturation}%, ${lightness}%, 0.3)`);
-            gradient.addColorStop(1, 'transparent');
-            ctx.fillStyle = gradient;
-            ctx.beginPath();
-            ctx.arc(x, y, size * 2, 0, Math.PI * 2);
-            ctx.fill();
-        });
+        // Create commit constellation
+        this.renderCommitConstellation(ctx, commits, analysis, progress);
         
-        // Add metadata
-        ctx.fillStyle = '#fff';
-        ctx.font = '14px Inter, sans-serif';
-        ctx.fillText(repoInfo.full_name, 20, 30);
-        ctx.fillStyle = '#666';
-        ctx.font = '12px Inter, sans-serif';
-        ctx.fillText(`${commits.length} commits`, 20, 50);
+        // Add activity waves
+        this.renderActivityWaves(ctx, commits, analysis, progress);
         
-        // Add timestamp
-        if (commits.length > 0) {
-            const lastCommit = commits[commits.length - 1];
-            const date = new Date(lastCommit.commit.author.date).toLocaleDateString();
-            ctx.fillText(date, 20, frameCanvas.height - 20);
-        }
+        // Add metadata overlay
+        this.renderMetadata(ctx, repoInfo, commits, progress);
         
         return frameCanvas;
     }
     
-    hashCode(str) {
-        let hash = 0;
-        for (let i = 0; i < str.length; i++) {
-            const char = str.charCodeAt(i);
-            hash = ((hash << 5) - hash) + char;
-            hash = hash & hash;
+    renderFlowField(ctx, commits, analysis, progress) {
+        // Create a dynamic flow field based on commit activity
+        const gridSize = 40;
+        const cols = Math.ceil(ctx.canvas.width / gridSize);
+        const rows = Math.ceil(ctx.canvas.height / gridSize);
+        
+        // Generate flow field based on commit density
+        for (let y = 0; y < rows; y++) {
+            for (let x = 0; x < cols; x++) {
+                const px = x * gridSize + gridSize / 2;
+                const py = y * gridSize + gridSize / 2;
+                
+                // Calculate field strength based on nearby commits
+                let fieldStrength = 0;
+                let fieldAngle = 0;
+                
+                commits.forEach((commit, index) => {
+                    if (index / commits.length > progress) return;
+                    
+                    const commitX = (index / commits.length) * ctx.canvas.width;
+                    const commitY = ctx.canvas.height / 2 + Math.sin(index * 0.5) * 100;
+                    
+                    const dx = commitX - px;
+                    const dy = commitY - py;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < 200) {
+                        const influence = 1 - (distance / 200);
+                        fieldStrength += influence;
+                        fieldAngle += Math.atan2(dy, dx) * influence;
+                    }
+                });
+                
+                // Draw flow lines
+                if (fieldStrength > 0.1) {
+                    ctx.save();
+                    ctx.translate(px, py);
+                    ctx.rotate(fieldAngle);
+                    
+                    const alpha = Math.min(fieldStrength * 0.3, 0.5);
+                    ctx.strokeStyle = `rgba(100, 200, 255, ${alpha})`;
+                    ctx.lineWidth = 1;
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(-gridSize * 0.3, 0);
+                    ctx.lineTo(gridSize * 0.3, 0);
+                    ctx.stroke();
+                    
+                    ctx.restore();
+                }
+            }
         }
-        return Math.abs(hash);
+    }
+    
+    renderCommitConstellation(ctx, commits, analysis, progress) {
+        // Draw commits as interconnected constellation
+        const processedCommits = commits.filter((_, index) => index / commits.length <= progress);
+        
+        // Draw connections first
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+        ctx.lineWidth = 1;
+        
+        processedCommits.forEach((commit, index) => {
+            if (index === 0) return;
+            
+            const prevIndex = index - 1;
+            const x1 = (prevIndex / commits.length) * ctx.canvas.width * 0.8 + ctx.canvas.width * 0.1;
+            const y1 = this.getCommitY(prevIndex, commits.length);
+            const x2 = (index / commits.length) * ctx.canvas.width * 0.8 + ctx.canvas.width * 0.1;
+            const y2 = this.getCommitY(index, commits.length);
+            
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            
+            // Curved connection
+            const cx = (x1 + x2) / 2;
+            const cy = (y1 + y2) / 2 - Math.abs(x2 - x1) * 0.2;
+            ctx.quadraticCurveTo(cx, cy, x2, y2);
+            ctx.stroke();
+        });
+        
+        // Draw commit nodes
+        processedCommits.forEach((commit, index) => {
+            const x = (index / commits.length) * ctx.canvas.width * 0.8 + ctx.canvas.width * 0.1;
+            const y = this.getCommitY(index, commits.length);
+            
+            // Get commit stats
+            const additions = commit.stats?.additions || Math.random() * 100;
+            const deletions = commit.stats?.deletions || Math.random() * 50;
+            const changes = additions + deletions;
+            
+            // Node size based on changes
+            const baseSize = 4;
+            const size = baseSize + Math.sqrt(changes) * 0.5;
+            
+            // Color based on author
+            const authorHue = analysis.authorColors.get(commit.commit.author.email) || 0;
+            const saturation = 60 + (additions / (changes || 1)) * 40;
+            
+            // Glow effect
+            const glowGradient = ctx.createRadialGradient(x, y, 0, x, y, size * 4);
+            glowGradient.addColorStop(0, `hsla(${authorHue}, ${saturation}%, 70%, 0.8)`);
+            glowGradient.addColorStop(0.5, `hsla(${authorHue}, ${saturation}%, 60%, 0.3)`);
+            glowGradient.addColorStop(1, 'transparent');
+            
+            ctx.fillStyle = glowGradient;
+            ctx.beginPath();
+            ctx.arc(x, y, size * 4, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Core node
+            ctx.fillStyle = `hsl(${authorHue}, ${saturation}%, 80%)`;
+            ctx.beginPath();
+            ctx.arc(x, y, size, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Pulse effect for recent commits
+            const recency = index / commits.length;
+            if (recency > progress - 0.1) {
+                const pulseSize = size * (1 + (1 - (recency - (progress - 0.1)) / 0.1) * 0.5);
+                ctx.strokeStyle = `hsla(${authorHue}, ${saturation}%, 90%, ${1 - (recency - (progress - 0.1)) / 0.1})`;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(x, y, pulseSize, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+        });
+    }
+    
+    getCommitY(index, total) {
+        // Create interesting vertical distribution
+        const centerY = this.canvas.height / 2;
+        const amplitude = this.canvas.height * 0.3;
+        
+        // Multiple wave functions for organic feel
+        const wave1 = Math.sin(index * 0.3) * amplitude * 0.5;
+        const wave2 = Math.sin(index * 0.7 + 1) * amplitude * 0.3;
+        const wave3 = Math.cos(index * 0.1) * amplitude * 0.2;
+        
+        return centerY + wave1 + wave2 + wave3;
+    }
+    
+    renderActivityWaves(ctx, commits, analysis, progress) {
+        // Create waves representing activity intensity
+        ctx.save();
+        ctx.globalCompositeOperation = 'screen';
+        
+        // Group commits by time periods
+        const periods = 10;
+        const commitsPerPeriod = Math.ceil(commits.length / periods);
+        
+        for (let p = 0; p < periods; p++) {
+            const startIdx = p * commitsPerPeriod;
+            const endIdx = Math.min((p + 1) * commitsPerPeriod, commits.length);
+            const periodCommits = commits.slice(startIdx, endIdx);
+            
+            if (endIdx / commits.length > progress) continue;
+            
+            // Calculate activity for this period
+            let activity = 0;
+            periodCommits.forEach(commit => {
+                const changes = (commit.stats?.additions || 10) + (commit.stats?.deletions || 5);
+                activity += changes;
+            });
+            
+            // Normalize activity
+            activity = Math.min(activity / 1000, 1);
+            
+            // Draw wave
+            const x = (p / periods) * ctx.canvas.width;
+            const waveHeight = activity * 100;
+            const waveWidth = ctx.canvas.width / periods;
+            
+            const gradient = ctx.createLinearGradient(x, ctx.canvas.height, x, ctx.canvas.height - waveHeight);
+            gradient.addColorStop(0, 'rgba(100, 200, 255, 0)');
+            gradient.addColorStop(1, `rgba(100, 200, 255, ${activity * 0.3})`);
+            
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.moveTo(x, ctx.canvas.height);
+            
+            for (let i = 0; i <= 20; i++) {
+                const wx = x + (i / 20) * waveWidth;
+                const wy = ctx.canvas.height - waveHeight * (0.5 + Math.sin(i * 0.5 + p) * 0.5);
+                ctx.lineTo(wx, wy);
+            }
+            
+            ctx.lineTo(x + waveWidth, ctx.canvas.height);
+            ctx.closePath();
+            ctx.fill();
+        }
+        
+        ctx.restore();
+    }
+    
+    renderMetadata(ctx, repoInfo, commits, progress) {
+        // Add subtle metadata
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        ctx.font = '16px Inter, sans-serif';
+        ctx.fillText(repoInfo.full_name, 20, 30);
+        
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.font = '12px Inter, sans-serif';
+        
+        const currentCommits = Math.floor(commits.length * progress);
+        ctx.fillText(`${currentCommits} commits`, 20, 50);
+        
+        if (commits[currentCommits - 1]) {
+            const lastCommit = commits[currentCommits - 1];
+            const date = new Date(lastCommit.commit.author.date).toLocaleDateString();
+            ctx.fillText(date, 20, ctx.canvas.height - 20);
+        }
     }
     
     playAnimation() {
@@ -212,7 +452,15 @@ class CommitArtGenerator {
         const animate = (timestamp) => {
             if (!this.isPlaying) return;
             
-            const delay = parseInt(this.speedSlider.value);
+            // Exponential speed mapping - slider 0-100, where 100 is fastest
+            const sliderValue = parseInt(this.speedSlider.value);
+            const normalizedValue = sliderValue / 100; // 0 to 1
+            
+            // Use exponential curve: slow start, fast end
+            // Map to delay: 2000ms (slow) to 50ms (very fast)
+            const minDelay = 50;
+            const maxDelay = 2000;
+            const delay = maxDelay * Math.pow(minDelay / maxDelay, normalizedValue);
             
             if (timestamp - this.lastFrameTime > delay) {
                 this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -255,17 +503,27 @@ class CommitArtGenerator {
         }
     }
     
-    updateSpeed() {
-        // Speed updates automatically on next frame
+    updateSpeedDisplay() {
+        // Update visual feedback for speed with graded steps
+        const sliderValue = parseInt(this.speedSlider.value);
+        const speedLabel = document.querySelector('.speed-label');
+        
+        // Define speed ranges with exponential feel
+        if (sliderValue < 15) {
+            speedLabel.textContent = 'Slow';
+        } else if (sliderValue < 40) {
+            speedLabel.textContent = 'Normal';
+        } else if (sliderValue < 70) {
+            speedLabel.textContent = 'Fast';
+        } else {
+            speedLabel.textContent = 'Very Fast';
+        }
     }
     
     async downloadGIF() {
         if (this.frames.length === 0) return;
         
-        this.showStatus('Creating GIF...');
-        
-        // Create GIF using canvas frames
-        const delay = parseInt(this.speedSlider.value);
+        this.showStatus('Creating image...');
         
         // For now, download current frame as PNG
         // In production, use gif.js or similar library
@@ -273,7 +531,7 @@ class CommitArtGenerator {
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'commit-flipbook.png';
+            a.download = `${this.repoUrlInput.value.split('/').pop()}-commits.png`;
             a.click();
             URL.revokeObjectURL(url);
             this.hideStatus();
