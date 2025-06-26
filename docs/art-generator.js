@@ -49,6 +49,18 @@ class CommitArtGenerator {
         
         // Initialize speed display
         this.updateSpeedDisplay();
+        
+        // Set random placeholder library
+        this.setRandomPlaceholderLibrary();
+    }
+    
+    setRandomPlaceholderLibrary() {
+        const libraries = ['React', 'Vue', 'TensorFlow', 'Bitcoin'];
+        const randomLibrary = libraries[Math.floor(Math.random() * libraries.length)];
+        const placeholderElement = document.getElementById('placeholder-library');
+        if (placeholderElement) {
+            placeholderElement.textContent = randomLibrary;
+        }
     }
     
     async handleSubmit(e) {
