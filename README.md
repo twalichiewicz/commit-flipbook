@@ -1,164 +1,129 @@
 # Commit Flipbook
 
-A tool that creates a flipbook animation/GIF showing how your actual code output evolves over time through your commit history.
+Transform any GitHub repository into beautiful generative art by visualizing its commit history.
 
-🌐 **Try it online**: [commit-flipbook.github.io](https://commit-flipbook.github.io) (coming soon)
+🌐 **Try it online**: [commit-flipbook.github.io](https://twalichiewicz.github.io/commit-flipbook)
 
 ## What it does
 
-Instead of just showing commit messages, this tool:
-1. **Clones your repository**
-2. **Checks out each commit** in chronological order
-3. **Executes your code** at each commit
-4. **Captures the actual output** (web pages, console output, etc.)
-5. **Creates an animated GIF** showing how your code's behavior changes over time
+Commit Flipbook creates unique, animated visualizations from GitHub repositories. Just enter a repo URL and watch as the commit history transforms into organic, flowing art.
 
-Perfect for visualizing the evolution of:
-- Web applications and their UI changes
-- Data visualizations and charts
-- Game development progress
-- Algorithm outputs
-- Art and creative coding projects
+### Features
 
-## Quick Start
+- **Automatic Art Generation** - No configuration needed, just paste a GitHub URL
+- **Dynamic Visualizations** - Each repository creates its own unique patterns
+- **Real-time Animation** - Watch commits flow and evolve
+- **Pure Client-Side** - Everything runs in your browser, no server needed
+- **Instant Results** - Uses GitHub API for fast visualization
+
+## How to Use
 
 ### 🌐 Web Interface (Easiest)
 
-Visit the web app and enter your GitHub repository URL:
-- Simple: Just paste your repo URL
-- No installation required
-- Results in minutes
+1. Visit the [web app](https://twalichiewicz.github.io/commit-flipbook)
+2. Enter any GitHub repository URL (e.g., `https://github.com/torvalds/linux`)
+3. Click "Generate" and watch the art unfold
+4. Adjust animation speed with the slider
+5. Download or share your creation
 
-### 💻 CLI Tool
+### 🎨 The Visualization
 
-For local use or automation:
+Each repository generates unique art based on:
 
-```bash
-npm install
-```
-
-## CLI Usage
-
-```bash
-node index.js <repo-url> [options]
-```
-
-### Arguments
-
-- `repo-url` - Full repository URL (e.g., `https://github.com/username/repo`)
-
-### Options
-
-- `-o, --output <path>` - Output GIF file path (default: "commit-flipbook.gif")
-- `-b, --branch <branch>` - Branch name (default: "main")
-- `-l, --limit <number>` - Maximum number of commits to include (default: 20)
-- `-w, --width <number>` - GIF width in pixels (default: 1200)
-- `-h, --height <number>` - GIF height in pixels (default: 800)
-- `-d, --delay <number>` - Delay between frames in milliseconds (default: 1000)
-- `--type <type>` - Project type: `auto|web|console|canvas` (default: auto)
-- `--entry <file>` - Entry point file (e.g., index.html, main.py, app.js)
-- `--command <cmd>` - Custom command to run your project
-- `--port <port>` - Port for web projects (default: 3000)
+- **Glowing Nodes** - Each commit is a point of light
+- **Size** - Reflects the amount of code changed
+- **Color** - Unique hue for each contributor
+- **Connections** - Curved lines show commit relationships
+- **Flow Fields** - Organic patterns respond to commit density
+- **Activity Waves** - Visualize coding intensity over time
+- **Organic Movement** - Natural wave patterns create flowing motion
 
 ### Examples
 
-Basic usage with a web project:
+Try these repositories for stunning visualizations:
+- `https://github.com/facebook/react` - See React's evolution
+- `https://github.com/tensorflow/tensorflow` - Machine learning history
+- `https://github.com/bitcoin/bitcoin` - Cryptocurrency development
+- `https://github.com/torvalds/linux` - The Linux kernel's journey
+
+## Technical Details
+
+### Architecture
+
+- **Frontend Only** - Static site hosted on GitHub Pages
+- **GitHub API** - Fetches commit data directly
+- **Canvas Rendering** - Hardware-accelerated graphics
+- **No Dependencies** - Pure JavaScript, no framework needed
+
+### How It Works
+
+1. **Fetch Commits** - Uses GitHub API to get repository history
+2. **Analyze Patterns** - Extracts author data and change statistics
+3. **Generate Frames** - Creates animated sequence showing evolution
+4. **Render Art** - Multiple visual layers create depth and movement
+5. **Animate** - Smooth playback with adjustable speed
+
+### Visual Elements
+
+- **Constellation Pattern** - Commits form an interconnected network
+- **Flow Fields** - Background patterns respond to commit activity
+- **Activity Waves** - Bottom waves show development intensity
+- **Glow Effects** - Recent commits pulse with energy
+- **Curved Connections** - Organic lines between related commits
+
+## Development
+
+### Local Setup
+
 ```bash
-node index.js https://github.com/username/my-webapp
+# Clone the repository
+git clone https://github.com/twalichiewicz/commit-flipbook.git
+cd commit-flipbook
+
+# Open in browser (no build needed!)
+open docs/index.html
+
+# Or run a local server
+python3 -m http.server 8000 -d docs
+# Visit http://localhost:8000
 ```
 
-Console application with custom command:
-```bash
-node index.js https://github.com/username/python-script --type console --command "python3 main.py"
+### Project Structure
+
+```
+commit-flipbook/
+├── docs/                    # GitHub Pages site
+│   ├── index.html          # Main interface
+│   ├── style.css           # Minimalist design
+│   └── art-generator.js    # Visualization engine
+├── examples/               # Example repositories
+└── README.md              # This file
 ```
 
-Canvas/art project with custom settings:
-```bash
-node index.js https://github.com/username/p5js-sketch --limit 10 --delay 2000
-```
+### Contributing
 
-Specific entry point:
-```bash
-node index.js https://github.com/username/react-app --entry "public/index.html"
-```
+Contributions are welcome! Feel free to:
+- Add new visualization styles
+- Improve performance
+- Enhance the UI
+- Fix bugs
+- Add features
 
-## Supported Project Types
+## Privacy & Security
 
-### 🌐 Web Projects
-- Static HTML/CSS/JS websites
-- React, Vue, Angular applications
-- Node.js web servers
-- Any project with `npm start` or similar scripts
+- **Client-Side Only** - Your data never leaves your browser
+- **Public Repos Only** - Uses GitHub's public API
+- **No Storage** - Nothing is saved or tracked
+- **Open Source** - Inspect the code yourself
 
-**How it works:** Starts a local server, opens the page in a headless browser, captures screenshots
+## Credits
 
-### 💻 Console Projects  
-- Python scripts
-- Node.js CLI tools
-- Any executable that produces text output
+Inspired by the beauty of collaborative development and the patterns that emerge from thousands of commits working together to build something amazing.
 
-**How it works:** Executes the main script, captures stdout/stderr output as text frames
+## License
 
-### 🎨 Canvas/Creative Projects
-- p5.js sketches
-- HTML5 Canvas applications
-- Creative coding projects
+MIT License - feel free to use this for your own projects!
 
-**How it works:** Similar to web projects but optimized for visual output
+---
 
-### 🔧 Auto-Detection
-The tool automatically detects project type by examining:
-- `package.json` scripts
-- Presence of `index.html`
-- File extensions (`.py`, `.js`, etc.)
-- Common file patterns
-
-## Output
-
-The generated GIF shows:
-- **Actual visual output** from your code at each commit
-- **Commit information overlay** (hash, message, date)
-- **Progress indicator** showing position in history
-- **Smooth transitions** between different versions
-
-## Requirements
-
-- Node.js 14+
-- Git installed and accessible
-- Dependencies for your target projects (Python, npm, etc.)
-- Chrome/Chromium for web project screenshots
-
-## How It Works
-
-1. **Clone & History**: Clones the repository and gets commit history
-2. **Time Travel**: Checks out each commit in chronological order  
-3. **Build**: Installs dependencies for each commit (if needed)
-4. **Execute**: Runs the project using detected or specified commands
-5. **Capture**: Takes screenshots (web) or captures text output (console)
-6. **Animate**: Combines all frames into a smooth GIF animation
-
-## Tips
-
-- Use `--limit` to control processing time (fewer commits = faster)
-- For long-running projects, use `--command` to specify quick demo commands
-- Web projects work best when they have predictable startup times
-- Consider using `--delay` to control animation speed
-
-## Examples
-
-Check out the `examples/` directory for ready-to-run demonstrations:
-- **Countdown Timer**: Web animation showing a countdown with effects
-- **Progress Bar**: Console application with ASCII progress visualization  
-- **Spiral Art**: Canvas-based generative art evolution
-
-See [examples/README.md](examples/README.md) for detailed instructions.
-
-## Examples of Great Use Cases
-
-- **Portfolio pieces**: Show your project's evolution
-- **Tutorial content**: Visualize step-by-step development
-- **Code reviews**: See actual output changes, not just code diffs
-- **Art projects**: Perfect for generative art and creative coding
-- **Data science**: Show how visualizations evolve with new data/algorithms
-
-Turn your commit history into a compelling visual story! 🎬
+*Each repository tells its own story through code. This tool helps you see that story as art.*

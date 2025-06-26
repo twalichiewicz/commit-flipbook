@@ -1,28 +1,29 @@
 {
   "name": "commit-flipbook",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "bin": {
-    "commit-flipbook": "./index.js"
-  },
+  "version": "2.0.0",
+  "description": "Transform GitHub repositories into beautiful generative art",
+  "main": "docs/art-generator.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node index.js"
+    "start": "python3 -m http.server 8000 -d docs",
+    "dev": "open docs/index.html"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
-  "dependencies": {
-    "@octokit/rest": "^22.0.0",
-    "canvas": "^3.1.2",
-    "chalk": "^5.4.1",
-    "commander": "^14.0.0",
-    "dotenv": "^16.5.0",
-    "fs-extra": "^11.3.0",
-    "gif-encoder-2": "^1.0.5",
-    "puppeteer": "^24.10.2",
-    "simple-git": "^3.28.0"
-  }
+  "keywords": [
+    "github",
+    "visualization",
+    "generative-art",
+    "commits",
+    "data-visualization",
+    "canvas",
+    "animation"
+  ],
+  "author": "twalichiewicz",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/twalichiewicz/commit-flipbook.git"
+  },
+  "bugs": {
+    "url": "https://github.com/twalichiewicz/commit-flipbook/issues"
+  },
+  "homepage": "https://twalichiewicz.github.io/commit-flipbook"
 }
