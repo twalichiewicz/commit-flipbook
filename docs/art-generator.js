@@ -1,11 +1,8 @@
 // Generative Art from GitHub Commits
 // Creates dynamic visualizations from repository evolution
 
-console.log('ArtGenerator script loaded');
-
 class SimpleVisualizer {
     constructor(canvas) {
-        console.log('SimpleVisualizer constructor called');
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
         this.animationId = null;
@@ -26,7 +23,6 @@ class SimpleVisualizer {
         this.canvas.style.width = width + 'px';
         this.canvas.style.height = height + 'px';
         
-        console.log('Canvas forced to fixed size:', { width, height });
     }
     
     async visualizeRepository(repoData) {
@@ -334,10 +330,13 @@ class CommitArtGenerator {
         try {
             // Use full placeholder URL if input is empty, even during animation
             const repoUrl = this.repoUrlInput.value.trim() || this.getCurrentPlaceholderUrl();
+            console.log('Using repo URL:', repoUrl);
             const { owner, repo } = this.parseGitHubUrl(repoUrl);
+            console.log('Parsed owner/repo:', { owner, repo });
             
             // Fetch repository info
             const repoInfo = await this.fetchRepoInfo(owner, repo);
+            console.log('Fetched repo info:', repoInfo);
             
             // Fetch multiple types of data
             this.showStatus('Loading repository data...');
@@ -375,29 +374,8 @@ class CommitArtGenerator {
             }, 100);
             
         } catch (error) {
-            // For debugging, let's create a simple test visualization
             console.error('Error fetching repo data:', error);
-            this.showStatus('Creating test visualization...');
-            
-            // Create dummy data for testing
-            const testData = {
-                info: { full_name: 'test/repo', created_at: '2020-01-01' },
-                commits: [
-                    { commit: { author: { email: 'test@test.com' } }, stats: { total: 10 } },
-                    { commit: { author: { email: 'test2@test.com' } }, stats: { total: 20 } }
-                ],
-                languages: { JavaScript: 1000, Python: 500 },
-                contributors: [{ contributions: 10 }, { contributions: 5 }],
-                stats: { stars: 100, forks: 50, issues: 10 }
-            };
-            
-            this.showResult();
-            // Wait for canvas to be visible, then resize and visualize
-            setTimeout(() => {
-                this.hideStatus();
-                this.visualizer.resize();
-                this.visualizer.visualizeRepository(testData);
-            }, 100);
+            this.showError(`Failed to load repository: ${error.message}`);
         } finally {
             this.setLoadingState(false);
         }
