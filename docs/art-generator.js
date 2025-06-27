@@ -327,10 +327,11 @@ class CommitArtGenerator {
         this.setLoadingState(true);
         this.showStatus('Analyzing repository...');
         
+        // Move repoUrl outside try block so it's accessible in catch
+        const repoUrl = this.repoUrlInput.value.trim() || this.getCurrentPlaceholderUrl();
+        console.log('Using repo URL:', repoUrl);
+        
         try {
-            // Use full placeholder URL if input is empty, even during animation
-            const repoUrl = this.repoUrlInput.value.trim() || this.getCurrentPlaceholderUrl();
-            console.log('Using repo URL:', repoUrl);
             const { owner, repo } = this.parseGitHubUrl(repoUrl);
             console.log('Parsed owner/repo:', { owner, repo });
             
