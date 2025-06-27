@@ -25,9 +25,8 @@ class CommitArtGenerator {
     }
     
     init() {
-        // Set canvas size
-        this.canvas.width = 800;
-        this.canvas.height = 800;
+        // Set canvas size to match CSS dimensions
+        this.resizeCanvas();
         
         // Initialize Three.js visualizer
         this.visualizer = new RepoVisualizer(this.canvas);
@@ -39,13 +38,30 @@ class CommitArtGenerator {
         
         // Handle window resize
         window.addEventListener('resize', () => {
+            this.resizeCanvas();
             if (this.visualizer) {
-                this.visualizer.resize(800, 800);
+                this.visualizer.resize(this.canvas.width, this.canvas.height);
             }
         });
         
         // Set random placeholder library
         this.setRandomPlaceholderLibrary();
+    }
+    
+    resizeCanvas() {
+        // Get the computed style of the canvas
+        const rect = this.canvas.getBoundingClientRect();
+        const computedStyle = window.getComputedStyle(this.canvas);
+        
+        // Set canvas internal dimensions to match displayed size
+        this.canvas.width = rect.width * window.devicePixelRatio;
+        this.canvas.height = parseInt(computedStyle.height) * window.devicePixelRatio;
+        
+        // Scale the drawing context back down
+        const ctx = this.canvas.getContext('2d');
+        if (ctx) {
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        }
     }
     
     setRandomPlaceholderLibrary() {
