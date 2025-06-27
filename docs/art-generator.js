@@ -368,12 +368,15 @@ class CommitArtGenerator {
                 }
             };
             
-            // Create 3D visualization
-            this.showStatus('Creating 3D visualization...');
-            await this.visualizer.visualizeRepository(this.repoData);
-            
-            // Show result
+            // Show result first
             this.showResult();
+            
+            // Wait for canvas to be visible, then create visualization
+            setTimeout(() => {
+                this.hideStatus();
+                this.visualizer.resize();
+                this.visualizer.visualizeRepository(this.repoData);
+            }, 100);
             
         } catch (error) {
             // For debugging, let's create a simple test visualization
@@ -392,8 +395,13 @@ class CommitArtGenerator {
                 stats: { stars: 100, forks: 50, issues: 10 }
             };
             
-            await this.visualizer.visualizeRepository(testData);
             this.showResult();
+            // Wait for canvas to be visible, then resize and visualize
+            setTimeout(() => {
+                this.hideStatus();
+                this.visualizer.resize();
+                this.visualizer.visualizeRepository(testData);
+            }, 100);
         } finally {
             this.setLoadingState(false);
         }
