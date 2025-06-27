@@ -1,5 +1,8 @@
+console.log('SimpleVisualizer script loaded');
+
 class SimpleVisualizer {
     constructor(canvas) {
+        console.log('SimpleVisualizer constructor called');
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
         this.animationId = null;

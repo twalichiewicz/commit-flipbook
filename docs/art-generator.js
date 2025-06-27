@@ -1,6 +1,8 @@
 // Generative Art from GitHub Commits
 // Creates dynamic visualizations from repository evolution
 
+console.log('ArtGenerator script loaded');
+
 class CommitArtGenerator {
     constructor() {
         this.form = document.getElementById('flipbook-form');
