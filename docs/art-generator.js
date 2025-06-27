@@ -13,16 +13,24 @@ class SimpleVisualizer {
     }
     
     resize() {
-        // Force fixed dimensions regardless of CSS
-        const width = 800;
-        const height = 400;
+        // Get the actual container dimensions
+        const rect = this.canvas.parentElement.getBoundingClientRect();
+        const width = rect.width || 800;
+        const height = 400; // Keep fixed height
         const dpr = window.devicePixelRatio || 1;
         
-        this.canvas.width = width;
-        this.canvas.height = height;
+        // Set canvas internal dimensions (for drawing)
+        this.canvas.width = width * dpr;
+        this.canvas.height = height * dpr;
+        
+        // Set canvas display dimensions (CSS)
         this.canvas.style.width = width + 'px';
         this.canvas.style.height = height + 'px';
         
+        // Scale context for retina displays
+        this.ctx.scale(dpr, dpr);
+        
+        console.log('Canvas resized to:', { width, height, dpr });
     }
     
     async visualizeRepository(repoData) {
@@ -75,8 +83,9 @@ class SimpleVisualizer {
         this.signature = signature;
         const { commits, languages, contributors } = repoData;
         
-        const centerX = this.canvas.width / 2;
-        const centerY = this.canvas.height / 2;
+        // Use display dimensions for drawing coordinates
+        const centerX = parseInt(this.canvas.style.width) / 2;
+        const centerY = parseInt(this.canvas.style.height) / 2;
         
         // Draw background particles
         this.drawBackgroundParticles(centerX, centerY, signature);
@@ -163,7 +172,7 @@ class SimpleVisualizer {
         this.ctx.lineWidth = 3;
         this.ctx.beginPath();
         
-        for (let x = 0; x < this.canvas.width; x += 5) {
+        for (let x = 0; x < parseInt(this.canvas.style.width); x += 5) {
             const y = centerY + Math.sin(x * 0.02 + this.time) * 50 * (signature.energy / 100);
             if (x === 0) {
                 this.ctx.moveTo(x, y);
@@ -176,8 +185,8 @@ class SimpleVisualizer {
     
     drawGrid(centerX, centerY, signature, commits) {
         const gridSize = 20;
-        const cols = Math.floor(this.canvas.width / gridSize);
-        const rows = Math.floor(this.canvas.height / gridSize);
+        const cols = Math.floor(parseInt(this.canvas.style.width) / gridSize);
+        const rows = Math.floor(parseInt(this.canvas.style.height) / gridSize);
         
         for (let i = 0; i < cols; i++) {
             for (let j = 0; j < rows; j++) {
@@ -216,7 +225,7 @@ class SimpleVisualizer {
         this.ctx.fillStyle = `hsla(${signature.primaryHue}, 80%, 70%, 0.8)`;
         this.ctx.font = '16px Inter, sans-serif';
         this.ctx.textAlign = 'center';
-        this.ctx.fillText(info.full_name, this.canvas.width / 2, 30);
+        this.ctx.fillText(info.full_name, parseInt(this.canvas.style.width) / 2, 30);
     }
     
     stop() {
