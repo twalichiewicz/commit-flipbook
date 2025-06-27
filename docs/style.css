@@ -443,10 +443,24 @@ body {
 }
 
 /* Footer */
+.footer {
+  margin-top: 40px;
+  text-align: center;
+}
+
 .footer-text {
   color: hsl(var(--muted-foreground));
-  margin-bottom: 16px;
-  font-size: 14px;
+  font-size: 9px;
+  margin: 0;
+}
+
+.footer-link {
+  color: hsl(var(--muted-foreground));
+  text-decoration: none;
+}
+
+.footer-link:hover {
+  color: hsl(var(--foreground));
 }
 
 /* How it works */

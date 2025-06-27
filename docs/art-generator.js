@@ -49,12 +49,50 @@ class CommitArtGenerator {
     }
     
     setRandomPlaceholderLibrary() {
-        const libraries = ['React', 'Vue', 'TensorFlow', 'Bitcoin'];
-        const randomLibrary = libraries[Math.floor(Math.random() * libraries.length)];
-        const placeholderElement = document.getElementById('placeholder-library');
-        if (placeholderElement) {
-            placeholderElement.textContent = randomLibrary;
-        }
+        const repositories = [
+            'https://github.com/facebook/react',
+            'https://github.com/vuejs/vue',
+            'https://github.com/tensorflow/tensorflow',
+            'https://github.com/bitcoin/bitcoin',
+            'https://github.com/microsoft/vscode',
+            'https://github.com/torvalds/linux'
+        ];
+        
+        let currentIndex = 0;
+        let isTyping = false;
+        
+        const typeText = async (text) => {
+            if (isTyping) return;
+            isTyping = true;
+            
+            // Clear current placeholder
+            for (let i = this.repoUrlInput.placeholder.length; i >= 0; i--) {
+                this.repoUrlInput.placeholder = this.repoUrlInput.placeholder.substring(0, i);
+                await new Promise(resolve => setTimeout(resolve, 30));
+            }
+            
+            // Wait a bit
+            await new Promise(resolve => setTimeout(resolve, 300));
+            
+            // Type new text
+            for (let i = 0; i <= text.length; i++) {
+                this.repoUrlInput.placeholder = text.substring(0, i);
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+            
+            isTyping = false;
+        };
+        
+        const cycleRepositories = async () => {
+            await typeText(repositories[currentIndex]);
+            currentIndex = (currentIndex + 1) % repositories.length;
+            
+            // Wait before cycling to next
+            setTimeout(cycleRepositories, 3000);
+        };
+        
+        // Start the animation
+        cycleRepositories();
     }
     
     async handleSubmit(e) {
@@ -65,7 +103,9 @@ class CommitArtGenerator {
         this.showStatus('Analyzing repository...');
         
         try {
-            const { owner, repo } = this.parseGitHubUrl(this.repoUrlInput.value);
+            // Use placeholder text if input is empty
+            const repoUrl = this.repoUrlInput.value.trim() || this.repoUrlInput.placeholder;
+            const { owner, repo } = this.parseGitHubUrl(repoUrl);
             
             // Fetch repository info
             const repoInfo = await this.fetchRepoInfo(owner, repo);
