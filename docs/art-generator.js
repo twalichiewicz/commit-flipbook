@@ -23,8 +23,8 @@ class CommitArtGenerator {
     }
     
     init() {
-        // Initialize Three.js visualizer (it will handle canvas sizing)
-        this.visualizer = new RepoVisualizer(this.canvas);
+        // Initialize simple visualizer
+        this.visualizer = new SimpleVisualizer(this.canvas);
         
         // Event listeners
         this.form.addEventListener('submit', (e) => this.handleSubmit(e));
