@@ -18,9 +18,9 @@ export class RepoVisualizer {
     }
     
     init() {
-        // Setup renderer
-        this.renderer.setSize(this.canvas.width, this.canvas.height);
-        this.renderer.setPixelRatio(window.devicePixelRatio);
+        // Setup renderer with proper sizing
+        this.updateSize();
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         
         // Setup camera
         this.camera.position.set(0, 0, 50);
@@ -48,24 +48,337 @@ export class RepoVisualizer {
         // Clear existing visualization
         this.clearScene();
         
+        // Generate unique art signature based on repo characteristics
+        const artSignature = this.generateArtSignature(repoData);
+        
         // Process repository data
-        const { commits, languages, contributors, stats } = repoData;
+        const { commits, languages, contributors, stats, info } = repoData;
         
-        // Create visualization based on data type
-        if (commits && commits.length > 0) {
-            this.createCommitGalaxy(commits);
-        }
-        
-        if (languages) {
-            this.createLanguageCrystal(languages);
-        }
-        
-        if (contributors && contributors.length > 0) {
-            this.createContributorNetwork(contributors);
-        }
+        // Create unique art style based on repo signature
+        this.createUniqueArtwork(repoData, artSignature);
         
         // Start animation
         this.animate();
+    }
+    
+    generateArtSignature(repoData) {
+        const { info, languages, contributors, commits } = repoData;
+        
+        // Create a unique hash based on repo characteristics
+        const repoName = info.full_name;
+        const createdAt = new Date(info.created_at).getTime();
+        const languageCount = Object.keys(languages || {}).length;
+        const contributorCount = contributors ? contributors.length : 0;
+        const commitCount = commits ? commits.length : 0;
+        
+        // Generate pseudo-random values based on repo characteristics
+        const seed = this.hashCode(repoName + createdAt);
+        const rng = this.createSeededRandom(seed);
+        
+        return {
+            seed,
+            rng,
+            primaryHue: Math.floor(rng() * 360),
+            secondaryHue: (Math.floor(rng() * 360) + 180) % 360,
+            complexity: Math.min(languageCount + contributorCount / 10, 10),
+            energy: Math.min(commitCount / 10, 100),
+            style: ['spiral', 'crystalline', 'organic', 'geometric'][Math.floor(rng() * 4)],
+            repoName,
+            languageCount,
+            contributorCount,
+            commitCount
+        };
+    }
+    
+    hashCode(str) {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            const char = str.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // Convert to 32-bit integer
+        }
+        return Math.abs(hash);
+    }
+    
+    createSeededRandom(seed) {
+        let m = 0x80000000;
+        let a = 1103515245;
+        let c = 12345;
+        let state = seed;
+        
+        return function() {
+            state = (a * state + c) % m;
+            return state / (m - 1);
+        };
+    }
+    
+    createUniqueArtwork(repoData, signature) {
+        const { commits, languages, contributors } = repoData;
+        
+        // Create base scene with repo-specific characteristics
+        this.createBaseEnvironment(signature);
+        
+        // Add commits visualization
+        if (commits && commits.length > 0) {
+            this.createUniqueCommitVisualization(commits, signature);
+        }
+        
+        // Add language representation
+        if (languages) {
+            this.createUniqueLanguageVisualization(languages, signature);
+        }
+        
+        // Add contributor representation
+        if (contributors && contributors.length > 0) {
+            this.createUniqueContributorVisualization(contributors, signature);
+        }
+        
+        // Add repo name as floating text
+        this.createRepoNameDisplay(signature);
+    }
+    
+    createBaseEnvironment(signature) {
+        // Create unique background particles
+        const particleCount = Math.floor(signature.complexity * 50 + 100);
+        const geometry = new THREE.BufferGeometry();
+        const positions = [];
+        const colors = [];
+        
+        for (let i = 0; i < particleCount; i++) {
+            // Create scattered background particles
+            positions.push(
+                (signature.rng() - 0.5) * 200,
+                (signature.rng() - 0.5) * 200,
+                (signature.rng() - 0.5) * 200
+            );
+            
+            // Color based on repo signature
+            const hue = signature.primaryHue + (signature.rng() - 0.5) * 60;
+            const color = new THREE.Color().setHSL(hue / 360, 0.5, 0.7);
+            colors.push(color.r, color.g, color.b);
+        }
+        
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+        
+        const material = new THREE.PointsMaterial({
+            size: 0.5,
+            vertexColors: true,
+            transparent: true,
+            opacity: 0.3
+        });
+        
+        const particles = new THREE.Points(geometry, material);
+        this.scene.add(particles);
+        
+        // Set unique fog color
+        const fogColor = new THREE.Color().setHSL(signature.primaryHue / 360, 0.2, 0.1);
+        this.scene.fog = new THREE.Fog(fogColor, 50, 150);
+    }
+    
+    createRepoNameDisplay(signature) {
+        // Create a simple text representation using geometry
+        const textGroup = new THREE.Group();
+        
+        // Create letters as simple geometries
+        const letterSpacing = 2;
+        let xPos = -signature.repoName.length * letterSpacing / 2;
+        
+        for (let i = 0; i < Math.min(signature.repoName.length, 20); i++) {
+            const char = signature.repoName[i];
+            if (char !== '/' && char !== '-' && char !== '_') {
+                const geometry = new THREE.BoxGeometry(0.5, 1, 0.1);
+                const material = new THREE.MeshBasicMaterial({
+                    color: new THREE.Color().setHSL(signature.primaryHue / 360, 0.8, 0.6),
+                    transparent: true,
+                    opacity: 0.7
+                });
+                const cube = new THREE.Mesh(geometry, material);
+                cube.position.set(xPos, -30, 0);
+                textGroup.add(cube);
+            }
+            xPos += letterSpacing;
+        }
+        
+        this.scene.add(textGroup);
+    }
+    
+    createUniqueCommitVisualization(commits, signature) {
+        switch (signature.style) {
+            case 'spiral':
+                this.createSpiralCommits(commits, signature);
+                break;
+            case 'crystalline':
+                this.createCrystallineCommits(commits, signature);
+                break;
+            case 'organic':
+                this.createOrganicCommits(commits, signature);
+                break;
+            case 'geometric':
+                this.createGeometricCommits(commits, signature);
+                break;
+        }
+    }
+    
+    createSpiralCommits(commits, signature) {
+        commits.forEach((commit, i) => {
+            const angle = i * 0.2 + signature.seed * 0.001;
+            const radius = Math.sqrt(i) * (signature.complexity * 0.5 + 1);
+            const height = (i / commits.length) * 30 - 15;
+            
+            const geometry = new THREE.SphereGeometry(0.2 + signature.rng() * 0.3, 8, 6);
+            const material = new THREE.MeshPhongMaterial({
+                color: new THREE.Color().setHSL(
+                    (signature.primaryHue + i * 10) / 360,
+                    0.7,
+                    0.5 + signature.rng() * 0.3
+                ),
+                transparent: true,
+                opacity: 0.8
+            });
+            
+            const sphere = new THREE.Mesh(geometry, material);
+            sphere.position.set(
+                Math.cos(angle) * radius,
+                height,
+                Math.sin(angle) * radius
+            );
+            
+            this.scene.add(sphere);
+        });
+    }
+    
+    createCrystallineCommits(commits, signature) {
+        commits.forEach((commit, i) => {
+            const geometry = new THREE.OctahedronGeometry(0.3 + signature.rng() * 0.4, 0);
+            const material = new THREE.MeshPhysicalMaterial({
+                color: new THREE.Color().setHSL(signature.secondaryHue / 360, 0.6, 0.7),
+                metalness: 0.3,
+                roughness: 0.4,
+                transparent: true,
+                opacity: 0.8
+            });
+            
+            const crystal = new THREE.Mesh(geometry, material);
+            crystal.position.set(
+                (signature.rng() - 0.5) * 40,
+                (signature.rng() - 0.5) * 40,
+                (signature.rng() - 0.5) * 40
+            );
+            crystal.rotation.set(
+                signature.rng() * Math.PI,
+                signature.rng() * Math.PI,
+                signature.rng() * Math.PI
+            );
+            
+            this.scene.add(crystal);
+        });
+    }
+    
+    createOrganicCommits(commits, signature) {
+        const curve = new THREE.CatmullRomCurve3([]);
+        const points = [];
+        
+        for (let i = 0; i < Math.min(commits.length, 20); i++) {
+            points.push(new THREE.Vector3(
+                Math.sin(i * 0.5) * (10 + signature.complexity),
+                (i - commits.length / 2) * 2,
+                Math.cos(i * 0.3) * (8 + signature.complexity)
+            ));
+        }
+        
+        if (points.length > 1) {
+            curve.points = points;
+            const tubeGeometry = new THREE.TubeGeometry(curve, 64, 0.5, 8, false);
+            const tubeMaterial = new THREE.MeshPhongMaterial({
+                color: new THREE.Color().setHSL(signature.primaryHue / 360, 0.8, 0.6)
+            });
+            const tube = new THREE.Mesh(tubeGeometry, tubeMaterial);
+            this.scene.add(tube);
+        }
+    }
+    
+    createGeometricCommits(commits, signature) {
+        for (let i = 0; i < Math.min(commits.length, 50); i++) {
+            const size = 0.5 + signature.rng() * 1;
+            const geometry = new THREE.BoxGeometry(size, size, size);
+            const material = new THREE.MeshLambertMaterial({
+                color: new THREE.Color().setHSL(
+                    (signature.primaryHue + i * 5) / 360,
+                    0.6,
+                    0.5
+                )
+            });
+            
+            const cube = new THREE.Mesh(geometry, material);
+            cube.position.set(
+                (i % 10 - 5) * 3,
+                Math.floor(i / 10) * 3 - 10,
+                (signature.rng() - 0.5) * 10
+            );
+            cube.rotation.set(
+                signature.rng() * Math.PI,
+                signature.rng() * Math.PI,
+                signature.rng() * Math.PI
+            );
+            
+            this.scene.add(cube);
+        }
+    }
+    
+    createUniqueLanguageVisualization(languages, signature) {
+        // Create language representation as colored rings or shapes
+        const languageEntries = Object.entries(languages);
+        const total = Object.values(languages).reduce((sum, val) => sum + val, 0);
+        
+        languageEntries.forEach(([language, bytes], index) => {
+            const percentage = bytes / total;
+            const radius = 15 + index * 2;
+            const thickness = percentage * 2;
+            
+            const geometry = new THREE.TorusGeometry(radius, thickness, 8, 16);
+            const material = new THREE.MeshPhongMaterial({
+                color: this.getLanguageColor(language),
+                transparent: true,
+                opacity: 0.7
+            });
+            
+            const torus = new THREE.Mesh(geometry, material);
+            torus.rotation.x = Math.PI / 2;
+            torus.position.y = index * 2 - languageEntries.length;
+            
+            this.scene.add(torus);
+        });
+    }
+    
+    createUniqueContributorVisualization(contributors, signature) {
+        contributors.slice(0, 20).forEach((contributor, i) => {
+            const geometry = new THREE.IcosahedronGeometry(
+                Math.log(contributor.contributions + 1) * 0.3,
+                0
+            );
+            
+            const material = new THREE.MeshPhongMaterial({
+                color: new THREE.Color().setHSL(
+                    (signature.secondaryHue + i * 18) / 360,
+                    0.7,
+                    0.6
+                ),
+                wireframe: signature.rng() > 0.5
+            });
+            
+            const mesh = new THREE.Mesh(geometry, material);
+            
+            // Position in a circle around the main visualization
+            const angle = (i / contributors.length) * Math.PI * 2;
+            mesh.position.set(
+                Math.cos(angle) * 25,
+                (signature.rng() - 0.5) * 20,
+                Math.sin(angle) * 25
+            );
+            
+            this.scene.add(mesh);
+        });
     }
     
     createCommitGalaxy(commits) {
@@ -272,9 +585,17 @@ export class RepoVisualizer {
         this.renderer.render(this.scene, this.camera);
     }
     
-    resize(width, height) {
+    updateSize() {
+        const rect = this.canvas.getBoundingClientRect();
+        const width = rect.width;
+        const height = rect.height;
+        
         this.camera.aspect = width / height;
         this.camera.updateProjectionMatrix();
-        this.renderer.setSize(width, height);
+        this.renderer.setSize(width, height, false);
+    }
+    
+    resize(width, height) {
+        this.updateSize();
     }
 }

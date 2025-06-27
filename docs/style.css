@@ -458,6 +458,7 @@ body {
   color: #888;
   text-decoration: underline;
   font-size: 9px;
+  font-weight: normal;
 }
 
 .footer-link:hover {

@@ -25,10 +25,7 @@ class CommitArtGenerator {
     }
     
     init() {
-        // Set canvas size to match CSS dimensions
-        this.resizeCanvas();
-        
-        // Initialize Three.js visualizer
+        // Initialize Three.js visualizer (it will handle canvas sizing)
         this.visualizer = new RepoVisualizer(this.canvas);
         
         // Event listeners
@@ -38,30 +35,13 @@ class CommitArtGenerator {
         
         // Handle window resize
         window.addEventListener('resize', () => {
-            this.resizeCanvas();
             if (this.visualizer) {
-                this.visualizer.resize(this.canvas.width, this.canvas.height);
+                this.visualizer.resize();
             }
         });
         
         // Set random placeholder library
         this.setRandomPlaceholderLibrary();
-    }
-    
-    resizeCanvas() {
-        // Get the computed style of the canvas
-        const rect = this.canvas.getBoundingClientRect();
-        const computedStyle = window.getComputedStyle(this.canvas);
-        
-        // Set canvas internal dimensions to match displayed size
-        this.canvas.width = rect.width * window.devicePixelRatio;
-        this.canvas.height = parseInt(computedStyle.height) * window.devicePixelRatio;
-        
-        // Scale the drawing context back down
-        const ctx = this.canvas.getContext('2d');
-        if (ctx) {
-            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-        }
     }
     
     setRandomPlaceholderLibrary() {
@@ -76,10 +56,12 @@ class CommitArtGenerator {
         
         let currentIndex = 0;
         let isTyping = false;
+        let currentFullUrl = repositories[0]; // Track the full URL
         
         const typeText = async (text) => {
             if (isTyping) return;
             isTyping = true;
+            currentFullUrl = text; // Set the full URL immediately
             
             // Clear current placeholder
             for (let i = this.repoUrlInput.placeholder.length; i >= 0; i--) {
@@ -107,6 +89,9 @@ class CommitArtGenerator {
             setTimeout(cycleRepositories, 3000);
         };
         
+        // Expose the current full URL for form submission
+        this.getCurrentPlaceholderUrl = () => currentFullUrl;
+        
         // Start the animation
         cycleRepositories();
     }
@@ -119,8 +104,8 @@ class CommitArtGenerator {
         this.showStatus('Analyzing repository...');
         
         try {
-            // Use placeholder text if input is empty
-            const repoUrl = this.repoUrlInput.value.trim() || this.repoUrlInput.placeholder;
+            // Use full placeholder URL if input is empty, even during animation
+            const repoUrl = this.repoUrlInput.value.trim() || this.getCurrentPlaceholderUrl();
             const { owner, repo } = this.parseGitHubUrl(repoUrl);
             
             // Fetch repository info
