@@ -19,12 +19,18 @@ class SimpleVisualizer {
         const rect = this.canvas.getBoundingClientRect();
         const dpr = window.devicePixelRatio || 1;
         
-        this.canvas.width = rect.width * dpr;
-        this.canvas.height = rect.height * dpr;
+        // Default to reasonable size if rect is empty
+        const width = rect.width || 800;
+        const height = rect.height || 400;
+        
+        this.canvas.width = width * dpr;
+        this.canvas.height = height * dpr;
         
         this.ctx.scale(dpr, dpr);
-        this.canvas.style.width = rect.width + 'px';
-        this.canvas.style.height = rect.height + 'px';
+        this.canvas.style.width = width + 'px';
+        this.canvas.style.height = height + 'px';
+        
+        console.log('Canvas resized to:', { width, height, rect });
     }
     
     async visualizeRepository(repoData) {
@@ -77,8 +83,8 @@ class SimpleVisualizer {
         this.signature = signature;
         const { commits, languages, contributors } = repoData;
         
-        const centerX = this.canvas.clientWidth / 2;
-        const centerY = this.canvas.clientHeight / 2;
+        const centerX = (this.canvas.clientWidth || this.canvas.width) / 2;
+        const centerY = (this.canvas.clientHeight || this.canvas.height) / 2;
         
         // Draw background particles
         this.drawBackgroundParticles(centerX, centerY, signature);
@@ -165,7 +171,7 @@ class SimpleVisualizer {
         this.ctx.lineWidth = 3;
         this.ctx.beginPath();
         
-        for (let x = 0; x < this.canvas.clientWidth; x += 5) {
+        for (let x = 0; x < (this.canvas.clientWidth || this.canvas.width); x += 5) {
             const y = centerY + Math.sin(x * 0.02 + this.time) * 50 * (signature.energy / 100);
             if (x === 0) {
                 this.ctx.moveTo(x, y);
@@ -178,8 +184,8 @@ class SimpleVisualizer {
     
     drawGrid(centerX, centerY, signature, commits) {
         const gridSize = 20;
-        const cols = Math.floor(this.canvas.clientWidth / gridSize);
-        const rows = Math.floor(this.canvas.clientHeight / gridSize);
+        const cols = Math.floor((this.canvas.clientWidth || this.canvas.width) / gridSize);
+        const rows = Math.floor((this.canvas.clientHeight || this.canvas.height) / gridSize);
         
         for (let i = 0; i < cols; i++) {
             for (let j = 0; j < rows; j++) {
@@ -218,7 +224,7 @@ class SimpleVisualizer {
         this.ctx.fillStyle = `hsla(${signature.primaryHue}, 80%, 70%, 0.8)`;
         this.ctx.font = '16px Inter, sans-serif';
         this.ctx.textAlign = 'center';
-        this.ctx.fillText(info.full_name, this.canvas.clientWidth / 2, 30);
+        this.ctx.fillText(info.full_name, (this.canvas.clientWidth || this.canvas.width) / 2, 30);
     }
     
     stop() {
