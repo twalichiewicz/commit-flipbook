@@ -316,14 +316,13 @@ body {
 /* Canvas */
 .result-canvas {
   width: 100%;
-  max-width: 100%;
+  max-width: 800px;
   height: 400px;
   border: 1px solid hsl(var(--border));
   border-radius: calc(var(--radius) - 2px);
   background: #000;
   display: block;
   margin: 0 auto;
-  object-fit: contain;
 }
 
 /* Result Info */

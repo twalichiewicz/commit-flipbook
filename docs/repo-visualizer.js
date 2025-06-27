@@ -1,7 +1,4 @@
-import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-
-export class RepoVisualizer {
+class RepoVisualizer {
     constructor(canvas) {
         this.canvas = canvas;
         this.scene = new THREE.Scene();
@@ -26,7 +23,7 @@ export class RepoVisualizer {
         this.camera.position.set(0, 0, 50);
         
         // Setup controls
-        this.controls = new OrbitControls(this.camera, this.canvas);
+        this.controls = new THREE.OrbitControls(this.camera, this.canvas);
         this.controls.enableDamping = true;
         this.controls.dampingFactor = 0.05;
         this.controls.autoRotate = true;
@@ -587,8 +584,8 @@ export class RepoVisualizer {
     
     updateSize() {
         const rect = this.canvas.getBoundingClientRect();
-        const width = rect.width;
-        const height = rect.height;
+        const width = rect.width || 800;
+        const height = rect.height || 400;
         
         this.camera.aspect = width / height;
         this.camera.updateProjectionMatrix();
