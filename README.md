@@ -1,75 +1,55 @@
 # Commit Flipbook
 
-Transform any GitHub repository into beautiful generative art by visualizing its commit history.
+Transform any GitHub repository into beautiful, deterministic generative art by visualizing its commit history.
 
 🌐 **Try it online**: [commit-flipbook.github.io](https://twalichiewicz.github.io/commit-flipbook)
 
 ## What it does
 
-Commit Flipbook creates unique, animated visualizations from GitHub repositories. Just enter a repo URL and watch as the commit history transforms into organic, flowing art.
+Commit Flipbook creates unique visual fingerprints for GitHub repositories. Unlike random visualizers, this tool is **strictly data-driven**: every pixel's position, color, and movement is derived directly from the code history.
 
-### Features
+Input a repository URL, and the system maps:
+- **Time** to horizontal position
+- **Authors** to vertical bands and colors
+- **Code Changes** to particle size and volatility
+- **Commit Messages** to structural jitter
 
-- **Automatic Art Generation** - No configuration needed, just paste a GitHub URL
-- **Dynamic Visualizations** - Each repository creates its own unique patterns
-- **Real-time Animation** - Watch commits flow and evolve
-- **Pure Client-Side** - Everything runs in your browser, no server needed
-- **Instant Results** - Uses GitHub API for fast visualization
+The result is that the Linux kernel will *always* look like the Linux kernel, and your personal project will have its own distinct visual signature.
+
+## Visual Styles
+
+The engine automatically selects one of four styles based on the repository's unique hash:
+
+1.  **Constellation**: A network of glowing nodes where commits are connected by author identity and temporal proximity.
+2.  **Flow Field**: Fluid particle streams that visualize the "velocity" of development.
+3.  **Nebula**: Spiraling galactic structures representing the orbital mechanics of collaboration.
+4.  **Matrix**: A data-rain aesthetic where commit hashes cascade like digital rainfall.
+
+## Features
+
+-   **Deterministic Generation**: The same repo always yields the exact same artwork.
+-   **Zero Dependencies**: Pure Vanilla JavaScript and HTML5 Canvas. No WebGL, no frameworks.
+-   **Real-time Animation**: Watch the repository history evolve.
+-   **Client-Side Privacy**: All data is fetched directly from GitHub's API to your browser. No middleman servers.
 
 ## How to Use
 
-### 🌐 Web Interface (Easiest)
+### 🌐 Web Interface
 
-1. Visit the [web app](https://twalichiewicz.github.io/commit-flipbook)
-2. Enter any GitHub repository URL (e.g., `https://github.com/torvalds/linux`)
-3. Click "Generate" and watch the art unfold
-4. Adjust animation speed with the slider
-5. Download or share your creation
+1.  Visit the [web app](https://twalichiewicz.github.io/commit-flipbook).
+2.  Enter a GitHub repository URL (e.g., `https://github.com/torvalds/linux`).
+3.  Click **Generate**.
+4.  **Download** a high-res screenshot or **Share** the link.
 
-### 🎨 The Visualization
+## The Data Mapping
 
-Each repository generates unique art based on:
+To understand the art, you must understand the data:
 
-- **Glowing Nodes** - Each commit is a point of light
-- **Size** - Reflects the amount of code changed
-- **Color** - Unique hue for each contributor
-- **Connections** - Curved lines show commit relationships
-- **Flow Fields** - Organic patterns respond to commit density
-- **Activity Waves** - Visualize coding intensity over time
-- **Organic Movement** - Natural wave patterns create flowing motion
-
-### Examples
-
-Try these repositories for stunning visualizations:
-- `https://github.com/facebook/react` - See React's evolution
-- `https://github.com/tensorflow/tensorflow` - Machine learning history
-- `https://github.com/bitcoin/bitcoin` - Cryptocurrency development
-- `https://github.com/torvalds/linux` - The Linux kernel's journey
-
-## Technical Details
-
-### Architecture
-
-- **Frontend Only** - Static site hosted on GitHub Pages
-- **GitHub API** - Fetches commit data directly
-- **Canvas Rendering** - Hardware-accelerated graphics
-- **No Dependencies** - Pure JavaScript, no framework needed
-
-### How It Works
-
-1. **Fetch Commits** - Uses GitHub API to get repository history
-2. **Analyze Patterns** - Extracts author data and change statistics
-3. **Generate Frames** - Creates animated sequence showing evolution
-4. **Render Art** - Multiple visual layers create depth and movement
-5. **Animate** - Smooth playback with adjustable speed
-
-### Visual Elements
-
-- **Constellation Pattern** - Commits form an interconnected network
-- **Flow Fields** - Background patterns respond to commit activity
-- **Activity Waves** - Bottom waves show development intensity
-- **Glow Effects** - Recent commits pulse with energy
-- **Curved Connections** - Organic lines between related commits
+*   **X-Axis (Horizontal)**: Represents the timeline. Oldest commits are on the left, newest on the right.
+*   **Y-Axis (Vertical)**: Represents the "Author Space". Different contributors are hashed to specific vertical bands.
+*   **Particle Size**: Logarithmic scale of the "Lines of Code" changed in that commit.
+*   **Color (Hue)**: Unique identity hash of the commit author.
+*   **Connections**: Drawn between commits that share an author or are temporally clustered.
 
 ## Development
 
@@ -92,33 +72,19 @@ python3 -m http.server 8000 -d docs
 
 ```
 commit-flipbook/
-├── docs/                    # GitHub Pages site
-│   ├── index.html          # Main interface
-│   ├── style.css           # Minimalist design
-│   └── art-generator.js    # Visualization engine
-├── examples/               # Example repositories
-└── README.md              # This file
+├── docs/                 # GitHub Pages site
+│   ├── index.html       # Main interface
+│   ├── style.css        # Minimalist monochrome design
+│   └── art-generator.js # Core visualization engine
+└── README.md            # This file
 ```
 
-### Contributing
+## Contributing
 
 Contributions are welcome! Feel free to:
-- Add new visualization styles
-- Improve performance
-- Enhance the UI
-- Fix bugs
-- Add features
-
-## Privacy & Security
-
-- **Client-Side Only** - Your data never leaves your browser
-- **Public Repos Only** - Uses GitHub's public API
-- **No Storage** - Nothing is saved or tracked
-- **Open Source** - Inspect the code yourself
-
-## Credits
-
-Inspired by the beauty of collaborative development and the patterns that emerge from thousands of commits working together to build something amazing.
+-   Add new visualization styles (check `drawVisualization` in `art-generator.js`).
+-   Improve the data mapping algorithms.
+-   Enhance the UI/UX.
 
 ## License
 

@@ -504,46 +504,70 @@ body {
 
 /* Examples */
 .examples-section {
-  margin-bottom: 64px;
+  margin-top: 24px;
+  margin-bottom: 48px;
 }
 
-.section-title {
-  font-size: 18px;
-  font-weight: 600;
-  margin-bottom: 24px;
-  letter-spacing: -0.025em;
+.examples-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: hsl(var(--muted-foreground));
+  margin-bottom: 12px;
 }
 
 .examples-grid {
   display: grid;
-  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 16px;
 }
 
 .example-card {
-  width: 100%;
-  padding: 16px;
-  text-align: left;
-  background-color: transparent;
-  border: 1px solid hsl(var(--border));
-  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
   cursor: pointer;
-  transition: all 0.2s;
+  group: hover;
 }
 
-.example-card:hover {
-  background-color: hsl(var(--accent));
-  border-color: hsl(var(--accent-foreground) / 0.2);
+.example-preview {
+  aspect-ratio: 1;
+  width: 100%;
+  border-radius: var(--radius);
+  border: 1px solid hsl(var(--border));
+  overflow: hidden;
+  margin-bottom: 8px;
+  transition: all 0.2s ease;
+  position: relative;
 }
 
-.example-title {
-  font-size: 14px;
-  font-weight: 500;
-  margin-bottom: 4px;
+.example-preview::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.2) 100%);
+  opacity: 0;
+  transition: opacity 0.2s;
 }
 
-.example-description {
+.example-card:hover .example-preview {
+  border-color: hsl(var(--foreground));
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.example-card:hover .example-preview::after {
+  opacity: 1;
+}
+
+.example-name {
   font-size: 12px;
+  font-weight: 500;
+  text-align: center;
   color: hsl(var(--muted-foreground));
+  transition: color 0.2s;
+}
+
+.example-card:hover .example-name {
+  color: hsl(var(--foreground));
 }
 
 /* Steps */
