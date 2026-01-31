@@ -91,7 +91,7 @@ class GeometricHelper {
 class SimpleVisualizer {
     constructor(canvas) {
         this.canvas = canvas;
-        this.ctx = canvas.getContext('2d', { alpha: false }); // Optimize for no transparency on base
+        this.ctx = canvas.getContext('2d');
         this.animationId = null;
         this.time = 0;
         this.particles = [];
@@ -142,23 +142,37 @@ class SimpleVisualizer {
         return ((value - inMin) * (outMax - outMin)) / (inMax - inMin) + outMin;
     }
     
-        async visualizeRepository(repoData) {
-            // Generate unique signature based on repo
-            const signature = this.generateSignature(repoData);
-            console.log('Visualizing:', signature, repoData.commits.length);
+            async visualizeRepository(repoData) {
     
-            // Initialize seeded RNG
-            this.rng = this.createSeededRNG(signature.hash);
-            this.noise = new SeededPerlinNoise(signature.hash);
-            
-            // Initialize particles/state based on style
-            this.initializeState(signature, repoData);
-            
-            // Start animation
-            this.animate(signature, repoData);
-        }
+                // Generate unique signature based on repo
+    
+                const signature = this.generateSignature(repoData);
+    
         
-        generateSignature(repoData) {        const { info, languages, contributors, commits } = repoData;
+    
+                // Initialize seeded RNG
+    
+                this.rng = this.createSeededRNG(signature.hash);
+    
+                this.noise = new SeededPerlinNoise(signature.hash);
+    
+                
+    
+                // Initialize particles/state based on style
+    
+                this.initializeState(signature, repoData);
+    
+                
+    
+                // Start animation
+    
+                this.animate(signature, repoData);
+    
+            }
+    
+            
+    
+            generateSignature(repoData) {        const { info, languages, contributors, commits } = repoData;
         const repoName = info.full_name;
         const hash = this.hashString(repoName);
 
@@ -239,8 +253,6 @@ class SimpleVisualizer {
         let minTime = Math.min(...times);
         let maxTime = Math.max(...times);
         
-        console.log('Active commits:', activeCommits.length, 'Time range:', minTime, maxTime);
-
         if (minTime === maxTime) {
             minTime -= 86400000; // -1 day
             maxTime += 86400000; // +1 day
@@ -251,7 +263,6 @@ class SimpleVisualizer {
         // Generate Particles from Commits
         activeCommits.forEach((commit, i) => {
             const p = this.mapCommitToParticle(commit, i, activeCommits.length, width, height, timeRange);
-            if (i === 0) console.log('First particle:', p);
             
             if (isNaN(p.x) || isNaN(p.y)) {
                 console.error('Invalid particle:', p);
@@ -326,7 +337,6 @@ class SimpleVisualizer {
     }
     
     drawVisualization(signature, repoData) {
-        if (Math.random() < 0.01) console.log('Drawing particles:', this.particles.length);
         const dpr = window.devicePixelRatio || 1;
         const width = this.canvas.width / dpr;
         const height = this.canvas.height / dpr;
