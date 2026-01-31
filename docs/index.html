@@ -19,6 +19,19 @@
         </header>
 
         <main class="main">
+            <div id="result" class="result" style="display: none;">
+                <div class="result-content">
+                    <canvas id="result-canvas" class="result-canvas"></canvas>
+                    <div class="result-info">
+                        <p class="result-hint">Unique deterministic artwork generated from repository name and characteristics</p>
+                    </div>
+                    <div class="result-actions">
+                        <button class="button button-secondary" id="download-btn">Download Screenshot</button>
+                        <button class="button button-secondary" id="share-btn">Share</button>
+                    </div>
+                </div>
+            </div>
+
             <section class="form-section">
                 <form id="flipbook-form" class="form">
                     <div class="form-group">
@@ -42,19 +55,19 @@
                     <p class="examples-label">Examples</p>
                     <div class="examples-grid">
                         <div class="example-card" data-repo="https://github.com/facebook/react">
-                            <div class="example-preview" style="background: radial-gradient(circle at center, #61dafb 0%, #000 70%);"></div>
+                            <img src="assets/react-preview.svg" class="example-preview" alt="React Visualization">
                             <span class="example-name">React</span>
                         </div>
                         <div class="example-card" data-repo="https://github.com/torvalds/linux">
-                            <div class="example-preview" style="background: radial-gradient(circle at center, #fceb44 0%, #000 70%);"></div>
+                            <img src="assets/linux-preview.svg" class="example-preview" alt="Linux Visualization">
                             <span class="example-name">Linux</span>
                         </div>
                         <div class="example-card" data-repo="https://github.com/tensorflow/tensorflow">
-                            <div class="example-preview" style="background: radial-gradient(circle at center, #ff6f00 0%, #000 70%);"></div>
+                            <img src="assets/tensorflow-preview.svg" class="example-preview" alt="TensorFlow Visualization">
                             <span class="example-name">TensorFlow</span>
                         </div>
                         <div class="example-card" data-repo="https://github.com/bitcoin/bitcoin">
-                            <div class="example-preview" style="background: radial-gradient(circle at center, #f7931a 0%, #000 70%);"></div>
+                            <img src="assets/bitcoin-preview.svg" class="example-preview" alt="Bitcoin Visualization">
                             <span class="example-name">Bitcoin</span>
                         </div>
                     </div>
@@ -67,19 +80,6 @@
                     </div>
                 </div>
 
-                <div id="result" class="result" style="display: none;">
-                    <div class="result-content">
-                        <canvas id="result-canvas" class="result-canvas"></canvas>
-                        <div class="result-info">
-                            <p class="result-hint">Unique deterministic artwork generated from repository name and characteristics</p>
-                        </div>
-                        <div class="result-actions">
-                            <button class="button button-secondary" id="download-btn">Download Screenshot</button>
-                            <button class="button button-secondary" id="share-btn">Share</button>
-                        </div>
-                    </div>
-                </div>
-
                 <div id="error" class="error" style="display: none;">
                     <p class="error-message"></p>
                 </div>
@@ -88,7 +88,7 @@
         </main>
 
         <footer class="footer">
-            <p class="footer-text">Thomas Walichiewicz 2025 | <a href="https://github.com/twalichiewicz/commit-flipbook" class="footer-link">GitHub</a> <a href="https://thomaswalichiewicz.com" class="footer-link">Website</a></p>
+            <p class="footer-text"><a href="https://github.com/twalichiewicz/commit-flipbook" class="footer-link">View on GitHub</a></p>
         </footer>
     </div>
 

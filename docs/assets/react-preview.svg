@@ -1,0 +1,22 @@
+<svg width="400" height="400" xmlns="http://www.w3.org/2000/svg" style="background: #0d1117">
+  <defs>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>
+      <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <!-- Constellation Connections -->
+  <path d="M100 200 Q 150 150 200 200 T 300 200" stroke="#61dafb" stroke-width="1" fill="none" opacity="0.3"/>
+  <path d="M50 100 L 150 250 L 250 150" stroke="#61dafb" stroke-width="0.5" fill="none" opacity="0.2"/>
+  
+  <!-- Particles -->
+  <circle cx="100" cy="200" r="4" fill="#61dafb" filter="url(#glow)"/>
+  <circle cx="150" cy="150" r="3" fill="#61dafb" opacity="0.8"/>
+  <circle cx="200" cy="200" r="5" fill="#61dafb" filter="url(#glow)"/>
+  <circle cx="250" cy="250" r="2" fill="#61dafb" opacity="0.6"/>
+  <circle cx="300" cy="200" r="4" fill="#61dafb" filter="url(#glow)"/>
+  
+  <!-- Random scattering -->
+  <circle cx="50" cy="100" r="2" fill="#ffffff" opacity="0.4"/>
+  <circle cx="350" cy="300" r="3" fill="#61dafb" opacity="0.5"/>
+</svg>

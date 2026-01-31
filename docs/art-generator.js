@@ -1,6 +1,93 @@
 // Generative Art from GitHub Commits
 // Creates dynamic visualizations from repository evolution
 
+// --- Core Utilities ---
+
+class SeededPerlinNoise {
+    constructor(seed) {
+        this.p = new Uint8Array(512);
+        this.permutation = new Uint8Array(256);
+        
+        // Initialize permutation table
+        for (let i = 0; i < 256; i++) {
+            this.permutation[i] = i;
+        }
+
+        // Shuffle based on seed (Linear Congruential Generator)
+        let m = 0x80000000;
+        let a = 1103515245;
+        let c = 12345;
+        let state = seed;
+        
+        const rng = () => {
+            state = (a * state + c) % m;
+            return state / (m - 1);
+        };
+
+        for (let i = 255; i > 0; i--) {
+            const j = Math.floor(rng() * (i + 1));
+            [this.permutation[i], this.permutation[j]] = [this.permutation[j], this.permutation[i]];
+        }
+
+        // Duplicate for overflow
+        for (let i = 0; i < 512; i++) {
+            this.p[i] = this.permutation[i % 256];
+        }
+    }
+
+    noise(x, y) {
+        const X = Math.floor(x) & 255;
+        const Y = Math.floor(y) & 255;
+
+        x -= Math.floor(x);
+        y -= Math.floor(y);
+
+        const u = this.fade(x);
+        const v = this.fade(y);
+
+        const A = this.p[X] + Y;
+        const B = this.p[X + 1] + Y;
+
+        return this.lerp(v, 
+            this.lerp(u, this.grad(this.p[A], x, y), this.grad(this.p[B], x - 1, y)),
+            this.lerp(u, this.grad(this.p[A + 1], x, y - 1), this.grad(this.p[B + 1], x - 1, y - 1))
+        );
+    }
+
+    fade(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
+    lerp(t, a, b) { return a + t * (b - a); }
+    grad(hash, x, y) {
+        const h = hash & 15;
+        const u = h < 8 ? x : y;
+        const v = h < 4 ? y : h === 12 || h === 14 ? x : 0;
+        return ((h & 1) === 0 ? u : -u) + ((h & 2) === 0 ? v : -v);
+    }
+}
+
+class GeometricHelper {
+    static getDistance(p1, p2) {
+        const dx = p1.x - p2.x;
+        const dy = p1.y - p2.y;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    static getNearestNeighbor(point, neighbors) {
+        let minDist = Infinity;
+        let nearestIndex = -1;
+
+        for (let i = 0; i < neighbors.length; i++) {
+            const dist = this.getDistance(point, neighbors[i]);
+            if (dist < minDist) {
+                minDist = dist;
+                nearestIndex = i;
+            }
+        }
+        return nearestIndex;
+    }
+}
+
+// --- Visualizer ---
+
 class SimpleVisualizer {
     constructor(canvas) {
         this.canvas = canvas;
@@ -9,6 +96,9 @@ class SimpleVisualizer {
         this.time = 0;
         this.particles = [];
         this.connections = [];
+        this.rng = Math.random; // Default to random
+        this.noise = null;
+        this.lifeGrid = [];
         
         // Set proper canvas size
         this.resize();
@@ -56,6 +146,10 @@ class SimpleVisualizer {
         // Generate unique signature based on repo
         const signature = this.generateSignature(repoData);
         
+        // Initialize seeded RNG
+        this.rng = this.createSeededRNG(signature.hash);
+        this.noise = new SeededPerlinNoise(signature.hash);
+        
         // Initialize particles/state based on style
         this.initializeState(signature, repoData);
         
@@ -80,7 +174,7 @@ class SimpleVisualizer {
             tertiaryHue: (hue + 90) % 360,
             complexity: Math.min(Object.keys(languages || {}).length + (contributors || []).length / 5, 20),
             energy: Math.min((commits || []).length / 20, 100),
-            style: ['constellation', 'flow', 'nebula', 'matrix'][hash % 4],
+            style: ['constellation', 'flow', 'nebula', 'matrix', 'mosaic', 'tree', 'life'][hash % 7],
             speed: 0.01 + ((hash % 10) / 1000)
         };
     }
@@ -116,8 +210,8 @@ class SimpleVisualizer {
 
         // 5. Velocity: Volatility (larger changes = faster/more erratic)
         const volatility = Math.min(stats.total / 100, 5);
-        const vx = ((commitHash % 100) / 100 - 0.5) * volatility * 0.5;
-        const vy = ((authorHash % 100) / 100 - 0.5) * volatility * 0.5;
+        const vx = ((commitHash % 100) / 100 - 0.5) * volatility * 0.2; // Reduced drift
+        const vy = ((authorHash % 100) / 100 - 0.5) * volatility * 0.2;
 
         return {
             x, y,
@@ -172,6 +266,19 @@ class SimpleVisualizer {
                  });
              }
         }
+
+        // For 'life' style (Cellular Automata)
+        if (signature.style === 'life') {
+            const cols = 50;
+            const rows = 50;
+            this.lifeGrid = new Array(cols).fill(0).map(() => new Array(rows).fill(0));
+            
+            for (let i = 0; i < cols; i++) {
+                for (let j = 0; j < rows; j++) {
+                    this.lifeGrid[i][j] = this.rng() > 0.8 ? 1 : 0; 
+                }
+            }
+        }
     }
     
     animate(signature, repoData) {
@@ -221,12 +328,92 @@ class SimpleVisualizer {
             case 'matrix':
                 this.drawMatrix(width, height, signature);
                 break;
+            case 'mosaic':
+                this.drawMosaic(width, height, signature);
+                break;
+            case 'tree':
+                this.drawTree(width, height, signature);
+                break;
+            case 'life':
+                this.drawLife(width, height, signature);
+                break;
             default:
                 this.drawConstellation(width, height, signature);
         }
 
         this.ctx.globalCompositeOperation = 'source-over';
         this.drawOverlay(width, height, signature, repoData);
+    }
+
+    drawTree(width, height, signature) {
+        const startX = width / 2;
+        const startY = height;
+        const branchLen = height / 4;
+        const angle = -Math.PI / 2; 
+        
+        this.ctx.lineWidth = 2;
+        this.recursiveBranch(startX, startY, branchLen, angle, 0, signature);
+    }
+
+    recursiveBranch(x, y, len, angle, depth, signature) {
+        if (depth > 10) return;
+
+        const wind = this.noise.noise(depth * 0.1, this.time * 0.2) * 0.5 - 0.25;
+        const finalAngle = angle + wind;
+
+        const endX = x + Math.cos(finalAngle) * len;
+        const endY = y + Math.sin(finalAngle) * len;
+
+        this.ctx.strokeStyle = `hsla(${signature.primaryHue + depth * 10}, 70%, ${70 - depth * 5}%, 0.8)`;
+        this.ctx.beginPath();
+        this.ctx.moveTo(x, y);
+        this.ctx.lineTo(endX, endY);
+        this.ctx.stroke();
+
+        const branchCount = 2 + (signature.hash % 2); 
+        const spread = 0.5 + (signature.hash % 10) / 20;
+
+        for (let i = 0; i < branchCount; i++) {
+            const newLen = len * 0.7;
+            const newAngle = finalAngle + spread * (i - (branchCount - 1) / 2);
+            this.recursiveBranch(endX, endY, newLen, newAngle, depth + 1, signature);
+        }
+    }
+
+    drawLife(width, height, signature) {
+        const cols = 50;
+        const rows = 50;
+        const cellW = width / cols;
+        const cellH = height / rows;
+        
+        for (let i = 0; i < cols; i++) {
+            for (let j = 0; j < rows; j++) {
+                if (this.lifeGrid[i][j] === 1) {
+                    this.ctx.fillStyle = `hsla(${signature.secondaryHue}, 70%, 60%, 0.8)`;
+                    this.ctx.fillRect(i * cellW, j * cellH, cellW - 1, cellH - 1);
+                }
+            }
+        }
+
+        if (Math.floor(this.time * 100) % 5 === 0) {
+            const next = this.lifeGrid.map(arr => [...arr]);
+            for (let i = 0; i < cols; i++) {
+                for (let j = 0; j < rows; j++) {
+                    let neighbors = 0;
+                    for (let x = -1; x <= 1; x++) {
+                        for (let y = -1; y <= 1; y++) {
+                            if (x === 0 && y === 0) continue;
+                            const ni = (i + x + cols) % cols;
+                            const nj = (j + y + rows) % rows;
+                            neighbors += this.lifeGrid[ni][nj];
+                        }
+                    }
+                    if (this.lifeGrid[i][j] === 1 && (neighbors < 2 || neighbors > 3)) next[i][j] = 0;
+                    else if (this.lifeGrid[i][j] === 0 && neighbors === 3) next[i][j] = 1;
+                }
+            }
+            this.lifeGrid = next;
+        }
     }
 
     drawConstellation(width, height, signature) {
@@ -285,12 +472,12 @@ class SimpleVisualizer {
     }
 
     drawFlowField(width, height, signature) {
-        const scale = 0.005;
+        const scale = 0.002;
         
         this.particles.forEach(p => {
-            // Calculate flow vector based on noise-like function (seeded by position)
-            // We use simple trig as a deterministic noise alternative
-            const angle = (Math.cos(p.x * scale + this.time) + Math.sin(p.y * scale + this.time)) * Math.PI;
+            // Calculate flow vector based on Perlin noise
+            const noiseVal = this.noise.noise(p.x * scale, p.y * scale + this.time * 0.1);
+            const angle = noiseVal * Math.PI * 4;
             
             p.x += Math.cos(angle) * 1;
             p.y += Math.sin(angle) * 1;
@@ -338,6 +525,46 @@ class SimpleVisualizer {
         });
     }
 
+    drawMosaic(width, height, signature) {
+        const gridSize = 15;
+        
+        // Update particle positions first
+        this.particles.forEach(p => {
+             p.x += Math.cos(this.time + p.phase) * 0.5;
+             p.y += Math.sin(this.time + p.phase) * 0.5;
+        });
+
+        // Draw pixelated Voronoi
+        for (let x = 0; x < width; x += gridSize) {
+            for (let y = 0; y < height; y += gridSize) {
+                const cx = x + gridSize / 2;
+                const cy = y + gridSize / 2;
+                
+                let minDist = Infinity;
+                let nearestP = null;
+                
+                for(let i=0; i<this.particles.length; i++) {
+                    const p = this.particles[i];
+                    if(p.isBackground) continue;
+                    
+                    const dx = cx - p.x;
+                    const dy = cy - p.y;
+                    const dist = dx*dx + dy*dy;
+                    
+                    if(dist < minDist) {
+                        minDist = dist;
+                        nearestP = p;
+                    }
+                }
+                
+                if (nearestP) {
+                    this.ctx.fillStyle = `hsla(${nearestP.hue}, 60%, 50%, 0.8)`;
+                    this.ctx.fillRect(x, y, gridSize, gridSize);
+                }
+            }
+        }
+    }
+
     drawMatrix(width, height, signature) {
          this.particles.forEach(p => {
             p.y += p.size * 0.5; // Rain down
@@ -370,6 +597,23 @@ class SimpleVisualizer {
         this.ctx.font = '12px Inter, sans-serif';
         this.ctx.fillStyle = `rgba(255, 255, 255, 0.6)`;
         this.ctx.fillText(`${repoData.commits.length} commits • ${Object.keys(repoData.languages || {}).length} languages`, width / 2, 65);
+
+        // Timeline Legend
+        const margin = 50;
+        const lineY = height - 30;
+        
+        this.ctx.beginPath();
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+        this.ctx.moveTo(margin, lineY);
+        this.ctx.lineTo(width - margin, lineY);
+        this.ctx.stroke();
+
+        this.ctx.font = '10px Inter, sans-serif';
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+        this.ctx.textAlign = 'left';
+        this.ctx.fillText('Oldest', margin, lineY + 15);
+        this.ctx.textAlign = 'right';
+        this.ctx.fillText('Newest', width - margin, lineY + 15);
     }
     
     stop() {

@@ -1,0 +1,11 @@
+<svg width="400" height="400" xmlns="http://www.w3.org/2000/svg" style="background: #0d1117">
+  <!-- Flow Fields -->
+  <path d="M0 200 C 100 100, 300 300, 400 200" stroke="#ff6f00" stroke-width="2" fill="none" opacity="0.6"/>
+  <path d="M0 220 C 100 120, 300 320, 400 220" stroke="#ff6f00" stroke-width="2" fill="none" opacity="0.4"/>
+  <path d="M0 180 C 100 80, 300 280, 400 180" stroke="#ff6f00" stroke-width="2" fill="none" opacity="0.4"/>
+  
+  <!-- Particles in flow -->
+  <circle cx="100" cy="150" r="3" fill="#ffa000"/>
+  <circle cx="200" cy="200" r="4" fill="#ff6f00"/>
+  <circle cx="300" cy="250" r="3" fill="#ffa000"/>
+</svg>

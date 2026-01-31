@@ -1,0 +1,20 @@
+<svg width="400" height="400" xmlns="http://www.w3.org/2000/svg" style="background: #0d1117">
+  <style>
+    .matrix { font-family: monospace; font-size: 14px; fill: #fceb44; opacity: 0.8; }
+  </style>
+  <!-- Matrix Rain -->
+  <text x="50" y="50" class="matrix" opacity="0.4">0x4F</text>
+  <text x="50" y="70" class="matrix" opacity="0.6">0xA2</text>
+  <text x="50" y="90" class="matrix" opacity="0.8">0xFF</text>
+  
+  <text x="150" y="120" class="matrix" opacity="0.3">commit</text>
+  <text x="150" y="140" class="matrix" opacity="0.7">ae8f2</text>
+  
+  <text x="250" y="200" class="matrix" opacity="0.5">init</text>
+  <text x="250" y="220" class="matrix" opacity="0.9">kernel</text>
+  
+  <text x="350" y="300" class="matrix" opacity="0.2">void</text>
+  
+  <!-- Subtle Grid -->
+  <path d="M0 0 L 400 400" stroke="#fceb44" opacity="0.1"/>
+</svg>
