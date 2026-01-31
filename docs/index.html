@@ -7,89 +7,101 @@
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="container">
-        <header class="header">
-            <div class="header-content">
-                <h1 class="title">Commit Flipbook</h1>
-                <p class="subtitle">Transform any GitHub repository into generative art</p>
-            </div>
-        </header>
+    <div class="stage">
+        <div id="result" class="result">
+            <canvas id="result-canvas" class="result-canvas"></canvas>
 
-        <main class="main">
-            <div id="result" class="result" style="display: none;">
-                <div class="result-content">
-                    <canvas id="result-canvas" class="result-canvas"></canvas>
-                    <div class="result-info">
-                        <p class="result-hint">Unique deterministic artwork generated from repository name and characteristics</p>
-                    </div>
-                    <div class="result-actions">
-                        <button class="button button-secondary" id="download-btn">Download Screenshot</button>
-                        <button class="button button-secondary" id="share-btn">Share</button>
-                    </div>
+            <div id="status" class="status" style="display: none;">
+                <p class="status-message"></p>
+                <div class="progress">
+                    <div class="progress-bar"></div>
                 </div>
             </div>
 
-            <section class="form-section">
-                <form id="flipbook-form" class="form">
-                    <div class="form-group">
-                        <input 
-                            type="url" 
-                            id="repo-url" 
-                            class="input"
-                            placeholder="" 
-                            pattern="https://github\.com/[^/]+/[^/]+"
-                        >
-                        <button type="submit" id="generate-btn" class="button button-primary">
-                            <span class="button-text">Generate</span>
-                            <svg class="button-loader" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
-                                <path d="M21 12a9 9 0 11-6.219-8.56"/>
-                            </svg>
+            <div id="error" class="error" style="display: none;">
+                <p class="error-message"></p>
+            </div>
+
+            <div class="overlay-stack">
+                <div class="overlay overlay-meta">
+                    <div class="overlay-info">
+                        <p id="repo-name" class="overlay-title">Commit Flipbook</p>
+                        <p id="repo-stats" class="overlay-stats">Enter a GitHub repository URL</p>
+                    </div>
+                    <div class="overlay-actions">
+                        <button class="button button-secondary" id="download-btn">
+                            <span class="button-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
+                                    <path d="M12 3v12"/>
+                                    <path d="M7 10l5 5 5-5"/>
+                                    <path d="M5 21h14"/>
+                                </svg>
+                            </span>
+                            <span class="button-label">Download Screenshot</span>
                         </button>
-                    </div>
-                </form>
-
-                <div class="examples-section">
-                    <p class="examples-label">Examples</p>
-                    <div class="examples-grid">
-                        <div class="example-card" data-repo="https://github.com/facebook/react">
-                            <img src="assets/react-preview.svg" class="example-preview" alt="React Visualization">
-                            <span class="example-name">React</span>
-                        </div>
-                        <div class="example-card" data-repo="https://github.com/torvalds/linux">
-                            <img src="assets/linux-preview.svg" class="example-preview" alt="Linux Visualization">
-                            <span class="example-name">Linux</span>
-                        </div>
-                        <div class="example-card" data-repo="https://github.com/tensorflow/tensorflow">
-                            <img src="assets/tensorflow-preview.svg" class="example-preview" alt="TensorFlow Visualization">
-                            <span class="example-name">TensorFlow</span>
-                        </div>
-                        <div class="example-card" data-repo="https://github.com/bitcoin/bitcoin">
-                            <img src="assets/bitcoin-preview.svg" class="example-preview" alt="Bitcoin Visualization">
-                            <span class="example-name">Bitcoin</span>
-                        </div>
+                        <button class="button button-secondary" id="share-btn">
+                            <span class="button-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
+                                    <circle cx="18" cy="5" r="3"/>
+                                    <circle cx="6" cy="12" r="3"/>
+                                    <circle cx="18" cy="19" r="3"/>
+                                    <path d="M8.6 10.7l6.8-3.9"/>
+                                    <path d="M15.4 17.2l-6.8-3.9"/>
+                                </svg>
+                            </span>
+                            <span class="button-label">Share</span>
+                        </button>
+                        <a class="button button-ghost" id="triglavis-btn" href="https://triglavis.com" target="_blank" rel="noreferrer" aria-label="Triglavis">
+                            <img src="assets/triglavis_dark.svg" class="brand-icon" alt="">
+                        </a>
                     </div>
                 </div>
 
-                <div id="status" class="status" style="display: none;">
-                    <p class="status-message"></p>
-                    <div class="progress">
-                        <div class="progress-bar"></div>
+                <div class="overlay overlay-controls">
+                    <div class="control-stack">
+                        <form id="flipbook-form" class="form">
+                            <div class="form-group">
+                                <input 
+                                    type="url" 
+                                    id="repo-url" 
+                                    class="input"
+                                    placeholder="" 
+                                    pattern="https://github\.com/[^/]+/[^/]+"
+                                >
+                                <div class="button-cluster">
+                                    <button type="submit" id="generate-btn" class="button button-primary">
+                                        <span class="button-text">Generate</span>
+                                        <svg class="button-loader" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
+                                            <path d="M21 12a9 9 0 11-6.219-8.56"/>
+                                        </svg>
+                                        <span class="button-check" aria-hidden="true">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                                                <path d="M5 12l5 5 9-9"/>
+                                            </svg>
+                                        </span>
+                                    </button>
+                                    <button type="button" id="randomize-btn" class="button button-tertiary" aria-label="Randomize">
+                                        <span class="button-icon" aria-hidden="true">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
+                                                <path d="M3 7h4l3 4"/>
+                                                <path d="M21 7h-4l-2 3"/>
+                                                <path d="M3 17h4l3-4"/>
+                                                <path d="M21 17h-4l-2-3"/>
+                                                <path d="M16 4l2 3-2 3"/>
+                                                <path d="M16 14l2 3-2 3"/>
+                                            </svg>
+                                        </span>
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
                     </div>
                 </div>
-
-                <div id="error" class="error" style="display: none;">
-                    <p class="error-message"></p>
-                </div>
-            </section>
-
-        </main>
-
-        <footer class="footer">
-            <p class="footer-text"><a href="https://github.com/twalichiewicz/commit-flipbook" class="footer-link">View on GitHub</a></p>
-        </footer>
+            </div>
+        </div>
     </div>
 
     <script src="art-generator.js"></script>

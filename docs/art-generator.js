@@ -110,19 +110,19 @@ class SimpleVisualizer {
         // Get the actual container dimensions
         const rect = this.canvas.parentElement.getBoundingClientRect();
         const width = rect.width || 800;
-        const height = 400; // Keep fixed height
+        const height = rect.height || 600;
         const dpr = window.devicePixelRatio || 1;
         
         // Set canvas internal dimensions (for drawing)
-        this.canvas.width = width * dpr;
-        this.canvas.height = height * dpr;
+        this.canvas.width = Math.max(1, Math.floor(width * dpr));
+        this.canvas.height = Math.max(1, Math.floor(height * dpr));
         
         // Set canvas display dimensions (CSS)
         this.canvas.style.width = width + 'px';
         this.canvas.style.height = height + 'px';
         
         // Scale context for retina displays
-        this.ctx.scale(dpr, dpr);
+        this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         
         // Reset particles on resize
         this.particles = [];
@@ -141,34 +141,52 @@ class SimpleVisualizer {
     mapValue(value, inMin, inMax, outMin, outMax) {
         return ((value - inMin) * (outMax - outMin)) / (inMax - inMin) + outMin;
     }
+
+    // Helper: Deterministic RNG for reproducible visuals
+    createSeededRNG(seed) {
+        let m = 0x80000000;
+        let a = 1103515245;
+        let c = 12345;
+        let state = Math.abs(seed) || 1;
+        return () => {
+            state = (a * state + c) % m;
+            return state / (m - 1);
+        };
+    }
     
-            async visualizeRepository(repoData) {
+                async visualizeRepository(repoData) {
     
-                // Generate unique signature based on repo
+                    // Ensure canvas is sized correctly
     
-                const signature = this.generateSignature(repoData);
+                    this.resize();
     
-        
+            
     
-                // Initialize seeded RNG
+                    // Generate unique signature based on repo
     
-                this.rng = this.createSeededRNG(signature.hash);
+                    const signature = this.generateSignature(repoData);
     
-                this.noise = new SeededPerlinNoise(signature.hash);
+            
     
-                
+                    // Initialize seeded RNG
     
-                // Initialize particles/state based on style
+                    this.rng = this.createSeededRNG(signature.hash);
     
-                this.initializeState(signature, repoData);
+                    this.noise = new SeededPerlinNoise(signature.hash);
     
-                
+                    
     
-                // Start animation
+                    // Initialize particles/state based on style
     
-                this.animate(signature, repoData);
+                    this.initializeState(signature, repoData);
     
-            }
+                    
+    
+                    // Start animation
+    
+                    this.animate(signature, repoData);
+    
+                }
     
             
     
@@ -195,12 +213,21 @@ class SimpleVisualizer {
 
     mapCommitToParticle(commit, index, total, width, height, timeRange) {
         const { minTime, maxTime } = timeRange;
-        const commitDate = new Date(commit.commit.author.date).getTime();
-        const authorName = commit.commit.author.name || 'Unknown';
-        const msgLength = commit.commit.message.length;
+        const commitInfo = commit?.commit || {};
+        const authorInfo = commitInfo.author || {};
+        const committerInfo = commitInfo.committer || {};
+        const commitMessage = commitInfo.message || '';
+        const authorName = authorInfo.name || authorInfo.email || 'Unknown';
         const stats = commit.stats || { total: 10 };
         const authorHash = this.hashString(authorName);
-        const commitHash = this.hashString(commit.sha || commit.commit.message); // Fallback for mock data
+        const hashSource = String(commit.sha || commitMessage || authorName);
+        const commitHash = this.hashString(hashSource);
+        const rawCommitDate = authorInfo.date || committerInfo.date;
+        const parsedCommitDate = new Date(rawCommitDate).getTime();
+        const commitDate = Number.isFinite(parsedCommitDate)
+            ? parsedCommitDate
+            : (minTime + maxTime) / 2;
+        const msgLength = commitMessage.length;
 
         // 1. Position X: Time-based (Oldest -> Newest)
         // Add some jitter based on message length so they aren't perfectly linear
@@ -248,10 +275,26 @@ class SimpleVisualizer {
         const activeCommits = (commits || []).slice(0, 150);
         if (activeCommits.length === 0) return;
 
-        // Calculate Time Range
-        const times = activeCommits.map(c => new Date(c.commit.author.date).getTime());
-        let minTime = Math.min(...times);
-        let maxTime = Math.max(...times);
+        // Calculate Time Range (guard against missing/invalid dates)
+        const times = activeCommits
+            .map(c => {
+                const dateValue = c?.commit?.author?.date || c?.commit?.committer?.date;
+                const parsed = new Date(dateValue).getTime();
+                return Number.isFinite(parsed) ? parsed : null;
+            })
+            .filter((time) => time !== null);
+
+        let minTime;
+        let maxTime;
+
+        if (times.length === 0) {
+            const fallbackBase = 946684800000 + (signature.hash % 31536000000); // Year 2000 + up to 1 year
+            minTime = fallbackBase - 86400000;
+            maxTime = fallbackBase + 86400000;
+        } else {
+            minTime = Math.min(...times);
+            maxTime = Math.max(...times);
+        }
         
         if (minTime === maxTime) {
             minTime -= 86400000; // -1 day
@@ -612,36 +655,8 @@ class SimpleVisualizer {
     }
     
     drawOverlay(width, height, signature, repoData) {
-        // Repo Name
-        this.ctx.font = 'bold 24px Inter, sans-serif';
-        this.ctx.textAlign = 'center';
-        this.ctx.fillStyle = `rgba(255, 255, 255, 0.9)`;
-        this.ctx.shadowBlur = 10;
-        this.ctx.shadowColor = 'black';
-        this.ctx.fillText(repoData.info.full_name, width / 2, 40);
-        this.ctx.shadowBlur = 0;
-
-        // Stats
-        this.ctx.font = '12px Inter, sans-serif';
-        this.ctx.fillStyle = `rgba(255, 255, 255, 0.6)`;
-        this.ctx.fillText(`${repoData.commits.length} commits • ${Object.keys(repoData.languages || {}).length} languages`, width / 2, 65);
-
-        // Timeline Legend
-        const margin = 50;
-        const lineY = height - 30;
-        
-        this.ctx.beginPath();
-        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-        this.ctx.moveTo(margin, lineY);
-        this.ctx.lineTo(width - margin, lineY);
-        this.ctx.stroke();
-
-        this.ctx.font = '10px Inter, sans-serif';
-        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-        this.ctx.textAlign = 'left';
-        this.ctx.fillText('Oldest', margin, lineY + 15);
-        this.ctx.textAlign = 'right';
-        this.ctx.fillText('Newest', width - margin, lineY + 15);
+        // Overlay text is handled by DOM for the Apple TV style UI.
+        return;
     }
     
     stop() {
@@ -661,9 +676,26 @@ class CommitArtGenerator {
         this.resultDiv = document.getElementById('result');
         this.errorDiv = document.getElementById('error');
         this.canvas = document.getElementById('result-canvas');
+        this.repoNameEl = document.getElementById('repo-name');
+        this.repoStatsEl = document.getElementById('repo-stats');
         
         this.visualizer = null;
         this.repoData = null;
+        this.placeholderCycleActive = false;
+        this.exampleRepos = [
+            'https://github.com/facebook/react',
+            'https://github.com/torvalds/linux',
+            'https://github.com/tensorflow/tensorflow'
+        ];
+        this.currentExampleIndex = 0;
+        this.placeholderRepos = [
+            'https://github.com/facebook/react',
+            'https://github.com/vuejs/vue',
+            'https://github.com/tensorflow/tensorflow',
+            'https://github.com/bitcoin/bitcoin',
+            'https://github.com/rust-lang/rust',
+            'https://github.com/torvalds/linux'
+        ];
         
         this.init();
     }
@@ -676,21 +708,15 @@ class CommitArtGenerator {
         this.form.addEventListener('submit', (e) => this.handleSubmit(e));
         document.getElementById('download-btn')?.addEventListener('click', () => this.downloadScreenshot());
         document.getElementById('share-btn')?.addEventListener('click', () => this.share());
-        
-        // Example cards
-        document.querySelectorAll('.example-card').forEach(card => {
-            card.addEventListener('click', () => {
-                this.repoUrlInput.value = card.dataset.repo;
-                // Trigger submit
-                this.form.dispatchEvent(new Event('submit'));
-                
-                // Scroll to result on mobile/small screens
-                setTimeout(() => {
-                   this.statusDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }, 100);
-            });
-        });
+        document.getElementById('randomize-btn')?.addEventListener('click', () => this.randomizeExample());
 
+        this.repoUrlInput.addEventListener('focus', () => {
+            document.body.classList.add('is-input-focused');
+        });
+        this.repoUrlInput.addEventListener('blur', () => {
+            document.body.classList.remove('is-input-focused');
+        });
+        
         // Handle window resize
         window.addEventListener('resize', () => {
             if (this.visualizer) {
@@ -700,21 +726,21 @@ class CommitArtGenerator {
         
         // Set random placeholder library
         this.setRandomPlaceholderLibrary();
+
+        // Initial overlay content
+        this.updateOverlay();
+
+        // Auto-pick an example repo on load
+        this.autoSelectExample();
+
+        // Idle UI fade for controls
+        this.setupIdleUI();
     }
     
     setRandomPlaceholderLibrary() {
-        const repositories = [
-            'https://github.com/facebook/react',
-            'https://github.com/vuejs/vue',
-            'https://github.com/tensorflow/tensorflow',
-            'https://github.com/bitcoin/bitcoin',
-            'https://github.com/rust-lang/rust',
-            'https://github.com/torvalds/linux'
-        ];
-        
         let currentIndex = 0;
         let isTyping = false;
-        let currentFullUrl = repositories[0]; 
+        let currentFullUrl = this.placeholderRepos[0]; 
         
         const typeText = async (text) => {
             if (isTyping) return;
@@ -727,9 +753,12 @@ class CommitArtGenerator {
             isTyping = false;
         };
         
+        this.placeholderCycleActive = true;
+
         const cycleRepositories = async () => {
-            await typeText(repositories[currentIndex]);
-            currentIndex = (currentIndex + 1) % repositories.length;
+            if (!this.placeholderCycleActive) return;
+            await typeText(this.placeholderRepos[currentIndex]);
+            currentIndex = (currentIndex + 1) % this.placeholderRepos.length;
             setTimeout(cycleRepositories, 4000);
         };
         
@@ -737,6 +766,75 @@ class CommitArtGenerator {
         this.getCurrentPlaceholderUrl = () => currentFullUrl;
         
         cycleRepositories();
+    }
+
+    autoSelectExample() {
+        if (this.repoUrlInput.value.trim()) return;
+        const repoUrl = this.getRandomExampleRepo();
+        if (!repoUrl) return;
+
+        this.repoUrlInput.value = repoUrl;
+        this.form.dispatchEvent(new Event('submit'));
+    }
+
+    getRandomExampleRepo() {
+        if (this.exampleRepos && this.exampleRepos.length) {
+            const index = Math.floor(Math.random() * this.exampleRepos.length);
+            this.currentExampleIndex = index;
+            return this.exampleRepos[index];
+        }
+        return null;
+    }
+
+    randomizeExample() {
+        if (!this.exampleRepos.length) return;
+        this.currentExampleIndex = (this.currentExampleIndex + 1) % this.exampleRepos.length;
+        const repoUrl = this.exampleRepos[this.currentExampleIndex];
+        if (!repoUrl) return;
+        this.repoUrlInput.value = repoUrl;
+        this.form.dispatchEvent(new Event('submit'));
+    }
+
+    setupIdleUI() {
+        const idleClass = 'is-idle';
+        const idleDelay = 3000;
+        let idleTimer = null;
+        const controls = document.querySelector('.overlay-controls');
+        const stack = document.querySelector('.overlay-stack');
+
+        const updateIdleShift = () => {
+            if (!controls || !stack) return;
+            const controlsHeight = controls.getBoundingClientRect().height;
+            const stackStyles = window.getComputedStyle(stack);
+            const gap = parseFloat(stackStyles.gap || '0') || 0;
+            const shift = Math.max(0, Math.round(controlsHeight));
+            const shiftActions = Math.max(0, Math.round(controlsHeight + gap));
+            document.body.style.setProperty('--idle-shift', `${shift}px`);
+            document.body.style.setProperty('--idle-shift-actions', `${shiftActions}px`);
+        };
+
+        const resetIdleTimer = () => {
+            if (idleTimer) clearTimeout(idleTimer);
+            idleTimer = setTimeout(() => {
+                updateIdleShift();
+                document.body.classList.add(idleClass);
+            }, idleDelay);
+        };
+
+        const wake = () => {
+            if (document.body.classList.contains(idleClass)) {
+                document.body.classList.remove(idleClass);
+            }
+            resetIdleTimer();
+        };
+
+        ['mousemove', 'mousedown', 'pointermove', 'touchstart', 'touchmove', 'keydown'].forEach((eventName) => {
+            window.addEventListener(eventName, wake, { passive: true });
+        });
+
+        window.addEventListener('resize', updateIdleShift);
+        updateIdleShift();
+        resetIdleTimer();
     }
     
     async handleSubmit(e) {
@@ -776,12 +874,12 @@ class CommitArtGenerator {
             };
             
             this.showResult();
-            document.querySelector('.result-hint').textContent = repoInfo.full_name;
+            this.updateOverlay(this.repoData);
+            this.updateInputPlaceholder(this.repoData);
             
             // Delay slightly to ensure canvas is ready
             setTimeout(() => {
                 this.hideStatus();
-                this.visualizer.resize();
                 this.visualizer.visualizeRepository(this.repoData);
             }, 50);
             
@@ -794,10 +892,10 @@ class CommitArtGenerator {
                 const fallbackData = this.createFallbackData(owner, repo);
                 
                 this.showResult();
-                document.querySelector('.result-hint').textContent = fallbackData.info.full_name;
+                this.updateOverlay(fallbackData);
+                this.updateInputPlaceholder(fallbackData);
                 setTimeout(() => {
                     this.hideStatus();
-                    this.visualizer.resize();
                     this.visualizer.visualizeRepository(fallbackData);
                 }, 100);
             } else {
@@ -846,21 +944,32 @@ class CommitArtGenerator {
         // Mock commits
         const commitCount = 50 + Math.floor(random() * 100);
         const commits = [];
-                for (let i = 0; i < commitCount; i++) {
-                    commits.push({
-                        commit: { 
-                            author: { 
-                                email: `dev${Math.floor(random() * 5)}@test.com`,
-                                date: new Date(Date.now() - Math.floor(random() * 31536000000)).toISOString()
-                            } 
-                        },
-                        stats: { 
-                            total: Math.floor(random() * 100) + 10,
-                            additions: Math.floor(random() * 60),
-                            deletions: Math.floor(random() * 40)
-                        }
-                    });
+        for (let i = 0; i < commitCount; i++) {
+            const authorIndex = Math.floor(random() * 5);
+            const commitDate = new Date(Date.now() - Math.floor(random() * 31536000000)).toISOString();
+            const messageSuffix = Math.floor(random() * 1000);
+            const sha = Math.floor(random() * 1e16).toString(16).padStart(16, '0');
+
+            commits.push({
+                sha,
+                commit: { 
+                    author: { 
+                        name: `Dev ${authorIndex + 1}`,
+                        email: `dev${authorIndex}@test.com`,
+                        date: commitDate
+                    },
+                    committer: {
+                        date: commitDate
+                    },
+                    message: `Generated commit ${i + 1} (${messageSuffix})`
+                },
+                stats: { 
+                    total: Math.floor(random() * 100) + 10,
+                    additions: Math.floor(random() * 60),
+                    deletions: Math.floor(random() * 40)
                 }
+            });
+        }
         
         return {
             info: { 
@@ -938,20 +1047,68 @@ class CommitArtGenerator {
     hideStatus() { this.statusDiv.style.display = 'none'; }
     
     showResult() {
-        this.hideAll();
-        this.resultDiv.style.display = 'block';
+        this.hideStatus();
+        this.errorDiv.style.display = 'none';
+        // Result is always visible now
     }
     
     showError(msg) {
         this.hideAll();
         this.errorDiv.style.display = 'block';
         this.errorDiv.querySelector('.error-message').textContent = msg;
+        this.updateOverlay();
     }
     
     hideAll() {
         this.statusDiv.style.display = 'none';
-        this.resultDiv.style.display = 'none';
         this.errorDiv.style.display = 'none';
+    }
+
+    formatNumber(value) {
+        if (typeof value !== 'number' || !Number.isFinite(value)) return '0';
+        if (typeof Intl !== 'undefined' && Intl.NumberFormat) {
+            return new Intl.NumberFormat('en', { notation: 'compact' }).format(value);
+        }
+        return String(value);
+    }
+
+    updateOverlay(repoData) {
+        if (!this.repoNameEl || !this.repoStatsEl) return;
+
+        if (!repoData) {
+            this.repoNameEl.textContent = 'Commit Flipbook';
+            this.repoStatsEl.textContent = 'Enter a GitHub repository URL';
+            return;
+        }
+
+        const commitCount = repoData.commits ? repoData.commits.length : 0;
+        const languageCount = Object.keys(repoData.languages || {}).length;
+        const stats = repoData.stats || {};
+        const parts = [
+            `${commitCount} commits`,
+            `${languageCount} languages`
+        ];
+
+        if (typeof stats.stars === 'number') {
+            parts.push(`${this.formatNumber(stats.stars)} stars`);
+        }
+        if (typeof stats.forks === 'number') {
+            parts.push(`${this.formatNumber(stats.forks)} forks`);
+        }
+
+        this.repoNameEl.textContent = repoData.info.full_name;
+        this.repoStatsEl.textContent = parts.join(' • ');
+    }
+
+    updateInputPlaceholder(repoData) {
+        if (!this.repoUrlInput) return;
+        if (!repoData || !repoData.info || !repoData.info.full_name) return;
+
+        const placeholder = `https://github.com/${repoData.info.full_name}`;
+        this.placeholderCycleActive = false;
+        this.repoUrlInput.value = '';
+        this.repoUrlInput.setAttribute('placeholder', placeholder);
+        this.getCurrentPlaceholderUrl = () => placeholder;
     }
     
     setLoadingState(loading) {
