@@ -97,9 +97,9 @@ body {
 
 .overlay-stack {
   position: absolute;
-  left: 9px;
-  right: 9px;
-  bottom: 9px;
+  left: 15px;
+  right: 15px;
+  bottom: 15px;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -125,9 +125,10 @@ body {
 }
 
 .overlay-controls {
-  width: min(640px, 100%);
+  width: 100%;
+  max-width: 640px;
   align-self: flex-end;
-  transition: opacity 0.6s ease, transform 0.6s ease;
+  transition: opacity 0.6s ease, transform 0.6s ease, max-width 0.4s ease;
 }
 
 .control-stack {
@@ -369,10 +370,11 @@ body.is-input-focused #randomize-btn {
 @media (min-width: 721px) {
   .overlay-stack {
     display: grid;
-    grid-template-columns: 1fr auto;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 640px);
     grid-template-rows: auto auto;
     gap: 10px 16px;
     align-items: end;
+    transition: grid-template-columns 0.4s ease, gap 0.6s ease;
   }
 
   .overlay-meta {
@@ -397,6 +399,12 @@ body.is-input-focused #randomize-btn {
     grid-column: 2;
     grid-row: 2;
     justify-self: end;
+    width: 100%;
+    max-width: none;
+  }
+
+  body.is-input-focused .overlay-stack {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 900px);
   }
 }
 
@@ -536,12 +544,6 @@ body.is-input-focused #randomize-btn {
   to { transform: rotate(360deg); }
 }
 
-@media (max-width: 900px) {
-  .overlay-controls {
-    width: min(420px, 100%);
-  }
-}
-
 @media (max-width: 720px) {
   .stage {
     padding: 9px;
@@ -562,6 +564,7 @@ body.is-input-focused #randomize-btn {
   .overlay-controls {
     width: 100%;
     align-self: stretch;
+    max-width: none;
   }
 
   .overlay-meta {
