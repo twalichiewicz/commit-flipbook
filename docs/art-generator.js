@@ -235,8 +235,14 @@ class SimpleVisualizer {
 
         // Calculate Time Range
         const times = activeCommits.map(c => new Date(c.commit.author.date).getTime());
-        const minTime = Math.min(...times);
-        const maxTime = Math.max(...times);
+        let minTime = Math.min(...times);
+        let maxTime = Math.max(...times);
+        
+        if (minTime === maxTime) {
+            minTime -= 86400000; // -1 day
+            maxTime += 86400000; // +1 day
+        }
+        
         const timeRange = { minTime, maxTime };
 
         // Generate Particles from Commits
@@ -748,6 +754,7 @@ class CommitArtGenerator {
             };
             
             this.showResult();
+            document.querySelector('.result-hint').textContent = repoInfo.full_name;
             
             // Delay slightly to ensure canvas is ready
             setTimeout(() => {
@@ -765,6 +772,7 @@ class CommitArtGenerator {
                 const fallbackData = this.createFallbackData(owner, repo);
                 
                 this.showResult();
+                document.querySelector('.result-hint').textContent = fallbackData.info.full_name;
                 setTimeout(() => {
                     this.hideStatus();
                     this.visualizer.resize();
