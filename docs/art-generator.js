@@ -142,23 +142,23 @@ class SimpleVisualizer {
         return ((value - inMin) * (outMax - outMin)) / (inMax - inMin) + outMin;
     }
     
-    async visualizeRepository(repoData) {
-        // Generate unique signature based on repo
-        const signature = this.generateSignature(repoData);
-        
-        // Initialize seeded RNG
-        this.rng = this.createSeededRNG(signature.hash);
-        this.noise = new SeededPerlinNoise(signature.hash);
-        
-        // Initialize particles/state based on style
-        this.initializeState(signature, repoData);
-        
-        // Start animation
-        this.animate(signature, repoData);
-    }
+        async visualizeRepository(repoData) {
+            // Generate unique signature based on repo
+            const signature = this.generateSignature(repoData);
+            console.log('Visualizing:', signature, repoData.commits.length);
     
-    generateSignature(repoData) {
-        const { info, languages, contributors, commits } = repoData;
+            // Initialize seeded RNG
+            this.rng = this.createSeededRNG(signature.hash);
+            this.noise = new SeededPerlinNoise(signature.hash);
+            
+            // Initialize particles/state based on style
+            this.initializeState(signature, repoData);
+            
+            // Start animation
+            this.animate(signature, repoData);
+        }
+        
+        generateSignature(repoData) {        const { info, languages, contributors, commits } = repoData;
         const repoName = info.full_name;
         const hash = this.hashString(repoName);
 
@@ -238,6 +238,8 @@ class SimpleVisualizer {
         let minTime = Math.min(...times);
         let maxTime = Math.max(...times);
         
+        console.log('Active commits:', activeCommits.length, 'Time range:', minTime, maxTime);
+
         if (minTime === maxTime) {
             minTime -= 86400000; // -1 day
             maxTime += 86400000; // +1 day
@@ -248,6 +250,7 @@ class SimpleVisualizer {
         // Generate Particles from Commits
         activeCommits.forEach((commit, i) => {
             const p = this.mapCommitToParticle(commit, i, activeCommits.length, width, height, timeRange);
+            if (i === 0) console.log('First particle:', p);
             this.particles.push(p);
         });
 
@@ -316,6 +319,7 @@ class SimpleVisualizer {
     }
     
     drawVisualization(signature, repoData) {
+        if (Math.random() < 0.01) console.log('Drawing particles:', this.particles.length);
         const width = parseInt(this.canvas.style.width);
         const height = parseInt(this.canvas.style.height);
         
@@ -824,18 +828,21 @@ class CommitArtGenerator {
         // Mock commits
         const commitCount = 50 + Math.floor(random() * 100);
         const commits = [];
-        for (let i = 0; i < commitCount; i++) {
-            commits.push({
-                commit: { 
-                    author: { email: `dev${Math.floor(random() * 5)}@test.com` } 
-                },
-                stats: { 
-                    total: Math.floor(random() * 100) + 10,
-                    additions: Math.floor(random() * 60),
-                    deletions: Math.floor(random() * 40)
+                for (let i = 0; i < commitCount; i++) {
+                    commits.push({
+                        commit: { 
+                            author: { 
+                                email: `dev${Math.floor(random() * 5)}@test.com`,
+                                date: new Date(Date.now() - Math.floor(random() * 31536000000)).toISOString()
+                            } 
+                        },
+                        stats: { 
+                            total: Math.floor(random() * 100) + 10,
+                            additions: Math.floor(random() * 60),
+                            deletions: Math.floor(random() * 40)
+                        }
+                    });
                 }
-            });
-        }
         
         return {
             info: { 
