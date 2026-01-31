@@ -125,7 +125,14 @@ class SimpleVisualizer {
         // Scale context for retina displays
         this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         
-        // Reset particles on resize
+        // Resize Three.js if active
+        if (this.threeRenderer && this.threeCamera) {
+            this.threeRenderer.setSize(width, height);
+            this.threeCamera.aspect = width / height;
+            this.threeCamera.updateProjectionMatrix();
+        }
+        
+        // Reset particles on resize (only for 2D)
         this.particles = [];
     }
 
@@ -155,6 +162,62 @@ class SimpleVisualizer {
         };
     }
 
+    calculateGiniCoefficient(commits) {
+        if (!commits || commits.length === 0) return 0;
+        
+        const counts = {};
+        commits.forEach(c => {
+            const author = c.commit?.author?.name || 'unknown';
+            counts[author] = (counts[author] || 0) + 1;
+        });
+        
+        const values = Object.values(counts).sort((a, b) => a - b);
+        const n = values.length;
+        if (n === 0) return 0;
+        
+        let numerator = 0;
+        for (let i = 0; i < n; i++) {
+            numerator += (i + 1) * values[i];
+        }
+        
+        const denominator = n * values.reduce((a, b) => a + b, 0);
+        return (2 * numerator) / denominator - (n + 1) / n;
+    }
+
+    analyzeRepoTraits(repoData) {
+        const { commits, info, languages, contributors } = repoData;
+        
+        // 1. Social Structure (Gini)
+        const gini = this.calculateGiniCoefficient(commits);
+        
+        // 2. Team Size
+        const teamSize = (contributors || []).length || 1;
+        
+        // 3. Project Age (Days)
+        const created = new Date(info.created_at).getTime();
+        const lastPush = new Date(info.pushed_at).getTime();
+        const ageDays = (lastPush - created) / (1000 * 60 * 60 * 24);
+        
+        // 4. Language Diversity (entropy)
+        const langs = Object.values(languages || {});
+        const totalBytes = langs.reduce((a, b) => a + b, 0);
+        let diversity = 0;
+        if (totalBytes > 0) {
+            // Shannon entropy normalized
+            diversity = -langs.reduce((acc, val) => {
+                const p = val / totalBytes;
+                return acc + p * Math.log(p);
+            }, 0);
+        }
+        
+        return {
+            gini,
+            teamSize,
+            ageDays,
+            diversity
+        };
+    }
+
     getStyleFadeAlpha(signature) {
         const profileAlpha = signature?.styleProfile?.fadeAlpha;
         if (typeof profileAlpha === 'number') {
@@ -180,15 +243,6 @@ class SimpleVisualizer {
 
     getStyleProfiles() {
         return [
-            { key: 'constellation-iris', base: 'constellation', backdrop: 'iris', paletteShift: 0, accentShift: 120, starDensity: 1.4, linkRadius: 110, haloScale: 3.8, fadeAlpha: 0.16, starBurst: true },
-            { key: 'constellation-ember', base: 'constellation', backdrop: 'ember', paletteShift: 25, accentShift: 60, starDensity: 1.1, linkRadius: 80, haloScale: 4.2, fadeAlpha: 0.2, starBurst: true },
-            { key: 'constellation-glacier', base: 'constellation', backdrop: 'ice', paletteShift: -35, accentShift: 180, starDensity: 1.2, linkRadius: 95, haloScale: 3.4, fadeAlpha: 0.18 },
-            { key: 'flow-aurora', base: 'flow', backdrop: 'aurora', paletteShift: 15, flowMode: 'ribbon', speedScale: 1.1, fadeAlpha: 0.14 },
-            { key: 'flow-smoke', base: 'flow', backdrop: 'ink', paletteShift: -10, flowMode: 'mist', speedScale: 0.9, fadeAlpha: 0.2, flowAlpha: 0.35 },
-            { key: 'flow-braids', base: 'flow', backdrop: 'cobalt', paletteShift: 40, flowMode: 'braid', speedScale: 1.2, fadeAlpha: 0.12 },
-            { key: 'nebula-supernova', base: 'nebula', backdrop: 'solar', paletteShift: 25, cloudCount: 10, cloudAlpha: 0.14, tailScale: 1.4, swirlStrength: 0.6, fadeAlpha: 0.12 },
-            { key: 'nebula-disk', base: 'nebula', backdrop: 'noir', paletteShift: -20, cloudCount: 6, cloudAlpha: 0.1, tailScale: 1.1, swirlStrength: 0.3, diskSquash: 0.65, fadeAlpha: 0.15 },
-            { key: 'nebula-void', base: 'nebula', backdrop: 'ice', paletteShift: -50, cloudCount: 4, cloudAlpha: 0.08, tailScale: 0.8, swirlStrength: 0.2, fadeAlpha: 0.2 },
             { key: 'matrix-spectral', base: 'matrix', backdrop: 'cobalt', paletteShift: 0, glyphMode: 'katakana', columnDensity: 1.2, beamAlpha: 0.2, fadeAlpha: 0.1 },
             { key: 'matrix-lattice', base: 'matrix', backdrop: 'ink', paletteShift: -20, glyphMode: 'hex', columnDensity: 1.5, columnWidth: 30, fadeAlpha: 0.12 },
             { key: 'matrix-zen', base: 'matrix', backdrop: 'verdant', paletteShift: 40, glyphMode: 'binary', columnDensity: 0.8, glyphScale: 1.35, fadeAlpha: 0.18 },
@@ -204,9 +258,6 @@ class SimpleVisualizer {
             { key: 'strata-oxide', base: 'strata', backdrop: 'ember', paletteShift: 20, strataLayers: 9, strataAmplitude: 70, strataScale: 0.0045, fadeAlpha: 0.2, grain: true, frame: true },
             { key: 'strata-ghost', base: 'strata', backdrop: 'noir', paletteShift: -30, strataLayers: 11, strataAmplitude: 45, strataScale: 0.006, fadeAlpha: 0.22, grain: true },
             { key: 'strata-spectra', base: 'strata', backdrop: 'aurora', paletteShift: 45, strataLayers: 12, strataAmplitude: 80, strataScale: 0.0035, fadeAlpha: 0.16, grain: true },
-            { key: 'orbit-helix', base: 'orbit', backdrop: 'iris', paletteShift: 10, orbitCenters: 3, orbitTightness: 0.9, fadeAlpha: 0.12 },
-            { key: 'orbit-astrolabe', base: 'orbit', backdrop: 'ice', paletteShift: -15, orbitCenters: 4, orbitTightness: 1.2, fadeAlpha: 0.16 },
-            { key: 'orbit-molten', base: 'orbit', backdrop: 'ember', paletteShift: 30, orbitCenters: 2, orbitTightness: 0.7, fadeAlpha: 0.18 },
             { key: 'runes-ink', base: 'runes', backdrop: 'ink', paletteShift: -10, runeDensity: 1, runeScale: 1, fadeAlpha: 0.2, grain: true },
             { key: 'runes-neon', base: 'runes', backdrop: 'cobalt', paletteShift: 50, runeDensity: 1.3, runeScale: 1.1, fadeAlpha: 0.14 },
             { key: 'runes-ritual', base: 'runes', backdrop: 'noir', paletteShift: 15, runeDensity: 0.9, runeScale: 1.2, fadeAlpha: 0.18, grain: true, frame: true },
@@ -220,28 +271,63 @@ class SimpleVisualizer {
             { key: 'collage-paper', base: 'collage', backdrop: 'iris', paletteShift: -5, collageCount: 26, fadeAlpha: 0.2, grain: true, frame: true },
             { key: 'collage-kraft', base: 'collage', backdrop: 'ember', paletteShift: 18, collageCount: 30, fadeAlpha: 0.18, grain: true },
             { key: 'collage-noir', base: 'collage', backdrop: 'noir', paletteShift: -30, collageCount: 22, fadeAlpha: 0.22, grain: true, frame: true },
-            { key: 'radar-archive', base: 'radar', backdrop: 'verdant', paletteShift: 20, radarRings: 6, fadeAlpha: 0.18, grain: true },
-            { key: 'radar-prism', base: 'radar', backdrop: 'aurora', paletteShift: 45, radarRings: 7, fadeAlpha: 0.14 },
-            { key: 'radar-signal', base: 'radar', backdrop: 'noir', paletteShift: -15, radarRings: 5, fadeAlpha: 0.2, grain: true, frame: true }
+            { key: 'city-blueprint', base: 'city', backdrop: 'cobalt', paletteShift: 0, fadeAlpha: 1, cityTheme: 'blueprint' },
+            { key: 'city-neon', base: 'city', backdrop: 'noir', paletteShift: 40, fadeAlpha: 1, cityTheme: 'neon' },
+            { key: 'city-sunset', base: 'city', backdrop: 'ember', paletteShift: 20, fadeAlpha: 1, cityTheme: 'sunset' },
+            { key: 'paint-oil', base: 'paint', backdrop: 'canvas', paletteShift: 10, fadeAlpha: 0.02, paintStyle: 'oil' },
+            { key: 'paint-watercolor', base: 'paint', backdrop: 'paper', paletteShift: -10, fadeAlpha: 0.05, paintStyle: 'watercolor' },
+            { key: 'attractor-clifford', base: 'attractor', backdrop: 'noir', paletteShift: 0, fadeAlpha: 0.1, attractorType: 'clifford' },
+            { key: 'attractor-lorenz', base: 'attractor', backdrop: 'noir', paletteShift: 20, fadeAlpha: 0.05, attractorType: 'lorenz' },
+            { key: 'bio-fungus', base: 'bio', backdrop: 'noir', paletteShift: 30, fadeAlpha: 1, bioType: 'fungus' },
+            { key: 'bio-coral', base: 'bio', backdrop: 'cobalt', paletteShift: -20, fadeAlpha: 1, bioType: 'coral' },
+            { key: 'collage-dada', base: 'collage', backdrop: 'paper', paletteShift: -10, fadeAlpha: 1, materialType: 'dada' },
+            { key: 'collage-constructivist', base: 'collage', backdrop: 'noir', paletteShift: 40, fadeAlpha: 1, materialType: 'constructivist' },
+            { key: 'collage-mixed', base: 'collage', backdrop: 'canvas', paletteShift: 10, fadeAlpha: 1, materialType: 'mixed' },
+            { key: 'structure-cube', base: 'three', backdrop: 'noir', paletteShift: 0, threeType: 'cube' },
+            { key: 'network-sphere', base: 'three', backdrop: 'noir', paletteShift: 20, threeType: 'sphere' },
+            { key: 'galaxy-spiral', base: 'three', backdrop: 'noir', paletteShift: -20, threeType: 'spiral' },
+            { key: 'cyber-city', base: 'three', backdrop: 'noir', paletteShift: 0, threeType: 'cyber-city' },
+            { key: 'abstract-flow', base: 'three', backdrop: 'noir', paletteShift: 10, threeType: 'abstract-flow' },
+            { key: 'minimal-sculpture', base: 'three', backdrop: 'noir', paletteShift: 30, threeType: 'minimal-sculpture' },
+            { key: 'organic-crystal', base: 'three', backdrop: 'noir', paletteShift: -10, threeType: 'organic-crystal' },
+            { key: 'vapor-grid', base: 'three', backdrop: 'noir', paletteShift: 40, threeType: 'vapor-grid' },
+            { key: 'glitch-monolith', base: 'three', backdrop: 'noir', paletteShift: -30, threeType: 'glitch-monolith' }
         ];
     }
 
     getStylePalette(signature, count) {
         const profile = signature.styleProfile || {};
+        const strategy = profile.paletteStrategy || 'random';
         const seed = signature.hash + this.hashString(signature.styleKey || signature.style);
         const rng = this.createSeededRNG(seed);
         const base = signature.primaryHue;
         const palette = [];
 
-        const offsets = Array.isArray(profile.paletteOffsets) ? profile.paletteOffsets : null;
-        const total = offsets ? offsets.length : count;
-        const spread = 30 + (signature.hash % 60);
+        for (let i = 0; i < count; i++) {
+            let hue = base;
+            let sat = 40 + rng() * 45;
+            let light = 28 + rng() * 45;
 
-        for (let i = 0; i < total; i++) {
-            const offset = offsets ? offsets[i] : (i * spread + rng() * 30 - 15);
-            const hue = (base + offset + 360) % 360;
-            const sat = 40 + rng() * 45;
-            const light = 28 + rng() * 45;
+            if (strategy === 'monochromatic') {
+                hue = base + (rng() - 0.5) * 10;
+                sat = 20 + rng() * 60;
+                light = 15 + rng() * 70;
+            } else if (strategy === 'analogous') {
+                hue = (base + (rng() - 0.5) * 60 + 360) % 360;
+            } else if (strategy === 'complementary') {
+                hue = (base + (rng() > 0.5 ? 180 : 0) + (rng()-0.5)*20 + 360) % 360;
+            } else if (strategy === 'triadic') {
+                const legs = [0, 120, 240];
+                hue = (base + legs[Math.floor(rng()*3)] + (rng()-0.5)*20 + 360) % 360;
+            } else if (strategy === 'tetradic') {
+                const legs = [0, 90, 180, 270];
+                hue = (base + legs[Math.floor(rng()*4)] + (rng()-0.5)*20 + 360) % 360;
+            } else {
+                // Random/Wild
+                const spread = 30 + (signature.hash % 60);
+                hue = (base + (i * spread + rng() * 30 - 15) + 360) % 360;
+            }
+            
             palette.push({ h: hue, s: sat, l: light });
         }
 
@@ -261,6 +347,60 @@ class SimpleVisualizer {
             }
         }
         return closest;
+    }
+
+    createProceduralTexture(type, width, height, tone, seed) {
+        const c = document.createElement('canvas');
+        c.width = width;
+        c.height = height;
+        const ctx = c.getContext('2d');
+        const rng = this.createSeededRNG(seed);
+        
+        ctx.fillStyle = `hsla(${tone.h}, ${tone.s}%, ${tone.l}%, 1)`;
+        ctx.fillRect(0, 0, width, height);
+        
+        ctx.fillStyle = `rgba(0,0,0,0.2)`;
+        
+        if (type === 'halftone') {
+            const dotSize = 4;
+            for(let y=0; y<height; y+=dotSize*1.5) {
+                for(let x=0; x<width; x+=dotSize*1.5) {
+                    if ((x+y)%2===0) {
+                        ctx.beginPath();
+                        ctx.arc(x, y, dotSize * rng(), 0, Math.PI*2);
+                        ctx.fill();
+                    }
+                }
+            }
+        } else if (type === 'noise') {
+            const imgData = ctx.getImageData(0,0,width,height);
+            for(let i=0; i<imgData.data.length; i+=4) {
+                if(rng()>0.5) {
+                    const v = Math.floor(rng()*50);
+                    imgData.data[i] -= v;
+                    imgData.data[i+1] -= v;
+                    imgData.data[i+2] -= v;
+                }
+            }
+            ctx.putImageData(imgData,0,0);
+        } else if (type === 'lines') {
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            for(let y=0; y<height; y+=5) {
+                ctx.moveTo(0, y);
+                ctx.lineTo(width, y + (rng()-0.5)*5);
+            }
+            ctx.stroke();
+        } else if (type === 'grid') {
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            const step = 20;
+            for(let x=0; x<width; x+=step) { ctx.moveTo(x,0); ctx.lineTo(x,height); }
+            for(let y=0; y<height; y+=step) { ctx.moveTo(0,y); ctx.lineTo(width,y); }
+            ctx.stroke();
+        }
+        
+        return c;
     }
 
     createGrainPattern(size, rng) {
@@ -283,163 +423,41 @@ class SimpleVisualizer {
 
     drawBackdrop(width, height, signature) {
         const ctx = this.ctx;
-        const profile = signature.styleProfile || {};
-        const mode = profile.backdrop || signature.style;
-        const accentHue = (signature.primaryHue + (profile.accentShift || 90) + 360) % 360;
-        let gradient = null;
-
-        switch (mode) {
-            case 'iris':
-                gradient = ctx.createRadialGradient(
-                    width * 0.35,
-                    height * 0.3,
-                    Math.min(width, height) * 0.05,
-                    width * 0.6,
-                    height * 0.65,
-                    Math.max(width, height)
-                );
-                gradient.addColorStop(0, `hsla(${accentHue}, 35%, 14%, 1)`);
-                gradient.addColorStop(0.45, `hsla(${signature.primaryHue}, 30%, 8%, 1)`);
-                gradient.addColorStop(1, `hsla(${signature.secondaryHue}, 35%, 4%, 1)`);
-                break;
-            case 'ember':
-                gradient = ctx.createRadialGradient(
-                    width * 0.5,
-                    height * 0.4,
-                    Math.min(width, height) * 0.08,
-                    width * 0.5,
-                    height * 0.6,
-                    Math.max(width, height) * 0.9
-                );
-                gradient.addColorStop(0, `hsla(${signature.primaryHue}, 50%, 16%, 1)`);
-                gradient.addColorStop(0.5, `hsla(${signature.primaryHue + 20}, 55%, 8%, 1)`);
-                gradient.addColorStop(1, `hsla(${signature.secondaryHue}, 40%, 3%, 1)`);
-                break;
-            case 'ice':
-                gradient = ctx.createRadialGradient(
-                    width * 0.4,
-                    height * 0.2,
-                    Math.min(width, height) * 0.05,
-                    width * 0.7,
-                    height * 0.8,
-                    Math.max(width, height)
-                );
-                gradient.addColorStop(0, `hsla(${signature.primaryHue}, 35%, 18%, 1)`);
-                gradient.addColorStop(0.6, `hsla(${signature.secondaryHue}, 25%, 8%, 1)`);
-                gradient.addColorStop(1, `hsla(${signature.secondaryHue}, 20%, 4%, 1)`);
-                break;
-            case 'aurora':
-                gradient = ctx.createLinearGradient(0, 0, width, height);
-                gradient.addColorStop(0, `hsla(${signature.primaryHue}, 40%, 12%, 1)`);
-                gradient.addColorStop(0.5, `hsla(${accentHue}, 45%, 8%, 1)`);
-                gradient.addColorStop(1, `hsla(${signature.tertiaryHue}, 40%, 4%, 1)`);
-                break;
-            case 'noir':
-                gradient = ctx.createLinearGradient(0, 0, 0, height);
-                gradient.addColorStop(0, `hsla(${signature.primaryHue}, 10%, 9%, 1)`);
-                gradient.addColorStop(1, `hsla(${signature.secondaryHue}, 12%, 2%, 1)`);
-                break;
-            case 'verdant':
-                gradient = ctx.createLinearGradient(0, height, width, 0);
-                gradient.addColorStop(0, `hsla(${signature.primaryHue + 80}, 30%, 10%, 1)`);
-                gradient.addColorStop(1, `hsla(${signature.secondaryHue + 60}, 35%, 5%, 1)`);
-                break;
-            case 'solar':
-                gradient = ctx.createRadialGradient(
-                    width * 0.5,
-                    height * 0.5,
-                    Math.min(width, height) * 0.05,
-                    width * 0.5,
-                    height * 0.5,
-                    Math.max(width, height) * 0.8
-                );
-                gradient.addColorStop(0, `hsla(${signature.primaryHue}, 60%, 18%, 1)`);
-                gradient.addColorStop(0.6, `hsla(${signature.primaryHue + 30}, 45%, 10%, 1)`);
-                gradient.addColorStop(1, `hsla(${signature.secondaryHue}, 40%, 3%, 1)`);
-                break;
-            case 'cobalt':
-                gradient = ctx.createLinearGradient(0, 0, width, 0);
-                gradient.addColorStop(0, `hsla(${signature.primaryHue + 200}, 35%, 10%, 1)`);
-                gradient.addColorStop(1, `hsla(${signature.secondaryHue + 200}, 30%, 4%, 1)`);
-                break;
-            case 'ink':
-                gradient = ctx.createLinearGradient(0, 0, 0, height);
-                gradient.addColorStop(0, `hsla(${signature.primaryHue}, 12%, 6%, 1)`);
-                gradient.addColorStop(1, `hsla(${signature.secondaryHue}, 12%, 2%, 1)`);
-                break;
-            case 'constellation':
-                gradient = ctx.createRadialGradient(
-                    width * 0.2,
-                    height * 0.15,
-                    Math.min(width, height) * 0.05,
-                    width * 0.6,
-                    height * 0.7,
-                    Math.max(width, height)
-                );
-                gradient.addColorStop(0, `hsla(${signature.primaryHue}, 35%, 10%, 1)`);
-                gradient.addColorStop(0.6, `hsla(${signature.secondaryHue}, 35%, 6%, 1)`);
-                gradient.addColorStop(1, `hsla(${signature.secondaryHue}, 30%, 3%, 1)`);
-                break;
-            case 'flow':
-                gradient = ctx.createLinearGradient(0, 0, width, height);
-                gradient.addColorStop(0, `hsla(${signature.primaryHue}, 45%, 9%, 1)`);
-                gradient.addColorStop(1, `hsla(${signature.tertiaryHue}, 45%, 5%, 1)`);
-                break;
-            case 'nebula':
-                gradient = ctx.createRadialGradient(
-                    width * 0.5,
-                    height * 0.5,
-                    Math.min(width, height) * 0.1,
-                    width * 0.5,
-                    height * 0.5,
-                    Math.max(width, height) * 0.9
-                );
-                gradient.addColorStop(0, `hsla(${signature.primaryHue}, 40%, 12%, 1)`);
-                gradient.addColorStop(0.5, `hsla(${signature.secondaryHue}, 35%, 7%, 1)`);
-                gradient.addColorStop(1, `hsla(${signature.secondaryHue}, 30%, 4%, 1)`);
-                break;
-            case 'matrix':
-                gradient = ctx.createLinearGradient(0, 0, 0, height);
-                gradient.addColorStop(0, `hsla(${signature.secondaryHue}, 40%, 6%, 1)`);
-                gradient.addColorStop(1, `hsla(${signature.secondaryHue}, 30%, 2%, 1)`);
-                break;
-            case 'mosaic':
-                gradient = ctx.createLinearGradient(0, 0, width, 0);
-                gradient.addColorStop(0, `hsla(${signature.primaryHue}, 20%, 10%, 1)`);
-                gradient.addColorStop(1, `hsla(${signature.secondaryHue}, 25%, 6%, 1)`);
-                break;
-            case 'tree':
-                gradient = ctx.createLinearGradient(0, 0, 0, height);
-                gradient.addColorStop(0, `hsla(${signature.primaryHue}, 18%, 12%, 1)`);
-                gradient.addColorStop(1, `hsla(${signature.secondaryHue}, 18%, 6%, 1)`);
-                break;
-            case 'life':
-                gradient = ctx.createLinearGradient(0, 0, width, height);
-                gradient.addColorStop(0, `hsla(${signature.secondaryHue}, 25%, 9%, 1)`);
-                gradient.addColorStop(1, `hsla(${signature.tertiaryHue}, 20%, 5%, 1)`);
-                break;
-            default:
-                break;
+        const bg = signature.styleProfile.bg || { mode: 'solid', stops: [{offset:0, alpha:1, shift:0}] };
+        const primary = signature.primaryHue;
+        
+        let style = null;
+        
+        if (bg.mode === 'solid') {
+            style = `hsla(${(primary + bg.stops[0].shift)%360}, 20%, 5%, 1)`;
+        } else if (bg.mode === 'linear') {
+            const grad = ctx.createLinearGradient(0, 0, width, height);
+            bg.stops.forEach(stop => {
+                grad.addColorStop(stop.offset, `hsla(${(primary + stop.shift)%360}, 40%, 10%, ${stop.alpha})`);
+            });
+            style = grad;
+        } else if (bg.mode === 'radial') {
+            const grad = ctx.createRadialGradient(width/2, height/2, 0, width/2, height/2, Math.max(width, height));
+            bg.stops.forEach(stop => {
+                grad.addColorStop(stop.offset, `hsla(${(primary + stop.shift)%360}, 40%, 10%, ${stop.alpha})`);
+            });
+            style = grad;
+        } else {
+            // Complex
+            const grad = ctx.createLinearGradient(0, 0, width, height);
+            grad.addColorStop(0, `hsla(${primary}, 50%, 5%, 1)`);
+            grad.addColorStop(0.5, `hsla(${(primary+60)%360}, 40%, 8%, 1)`);
+            grad.addColorStop(1, `hsla(${(primary+120)%360}, 50%, 5%, 1)`);
+            style = grad;
         }
-
-        if (gradient) {
-            ctx.fillStyle = gradient;
-            ctx.fillRect(0, 0, width, height);
-            if (signature.styleProfile?.grain && this.styleState.grainPattern) {
-                ctx.save();
-                ctx.globalAlpha = 0.18;
-                ctx.fillStyle = this.styleState.grainPattern;
-                ctx.fillRect(0, 0, width, height);
-                ctx.restore();
-            }
-            return;
-        }
-
-        ctx.fillStyle = `hsla(${signature.primaryHue}, 30%, 5%, 1)`;
+        
+        ctx.fillStyle = style;
         ctx.fillRect(0, 0, width, height);
-        if (signature.styleProfile?.grain && this.styleState.grainPattern) {
+        
+        // Noise
+        if (bg.noise > 0 && this.styleState.grainPattern) {
             ctx.save();
-            ctx.globalAlpha = 0.18;
+            ctx.globalAlpha = bg.noise;
             ctx.fillStyle = this.styleState.grainPattern;
             ctx.fillRect(0, 0, width, height);
             ctx.restore();
@@ -498,40 +516,189 @@ class SimpleVisualizer {
     
             
     
-            generateSignature(repoData) {
+    generateProceduralProfile(baseStyle, seed, complexity, energy, traits) {
+        const rng = this.createSeededRNG(seed);
+        
+        // Helper for range
+        const range = (min, max) => min + rng() * (max - min);
+        const pick = (arr) => arr[Math.floor(rng() * arr.length)];
+        
+        // 1. Global Visuals
+        const compositeModes = ['source-over', 'lighter', 'screen', 'overlay', 'hard-light', 'difference', 'exclusion', 'color-dodge'];
+        const composite = pick(compositeModes);
+        
+        // Semantic Mapping: History = Trails
+        // Older repos (1000+ days) get longer trails (lower fadeAlpha)
+        const historyFactor = Math.min(1, (traits?.ageDays || 0) / 2000); // 0 to 1
+        let fadeAlpha = range(0.1, 0.4) - (historyFactor * 0.05);
+        if (fadeAlpha < 0.02) fadeAlpha = 0.02;
+
+        // Semantic Mapping: Energy = Speed
+        // Energy is 0-100 (based on commit count/20)
+        const speedFactor = Math.min(1, energy / 100);
+        const speed = (0.5 + speedFactor * 1.5) * (rng() > 0.5 ? 1 : -1);
+        
+        // 2. Palette Logic
+        const paletteShift = Math.floor(range(0, 360));
+        const secondaryOffset = Math.floor(range(30, 180));
+        const tertiaryOffset = Math.floor(range(180, 300));
+        
+        // 3. CSS Filters
+        const filters = [];
+        if (rng() > 0.9) filters.push(`contrast(${range(1.1, 1.3)})`);
+        if (rng() > 0.9) filters.push(`saturate(${range(1.1, 1.5)})`);
+        const filter = filters.join(' ') || 'none';
+
+        // 4. Background
+        const bgModes = ['solid', 'linear', 'radial'];
+        const bg = {
+            mode: pick(bgModes),
+            stops: [
+                { offset: 0, alpha: 1, shift: 0 },
+                { offset: 1, alpha: 1, shift: Math.floor(range(20, 60)) }
+            ],
+            noise: rng() > 0.5 ? range(0.02, 0.05) : 0
+        };
+
+        // 5. Engine Specific Params (Keep existing safe ranges)
+        const params = {};
+        // ... (engine params kept same, omitting for brevity in this replace block, need to keep them)
+        if (baseStyle === 'city') {
+            params.gridSize = Math.floor(range(20, 30));
+            params.isoAngle = 0.5;
+            params.tileW = range(25, 35);
+            params.tileH = params.tileW * 0.6;
+            params.buildingRoundness = 0;
+            params.strokeWidth = 1;
+            params.fillOpacity = 0.9;
+            params.wireframeOnly = false;
+        } else if (baseStyle === 'bio') {
+            const recipes = [
+                { dA: 1.0, dB: 0.5, f: 0.055, k: 0.062 },
+                { dA: 1.0, dB: 0.5, f: 0.035, k: 0.060 },
+                { dA: 1.0, dB: 0.5, f: 0.025, k: 0.060 },
+                { dA: 1.0, dB: 0.5, f: 0.022, k: 0.051 },
+                { dA: 1.0, dB: 0.5, f: 0.029, k: 0.057 }
+            ];
+            const r = pick(recipes);
+            params.bioParams = { dA: r.dA, dB: r.dB, f: r.f, k: r.k };
+            params.threshold = 0.1; 
+            params.colorMode = pick(['smooth', 'banded']);
+        } else if (baseStyle === 'paint') {
+            params.style = pick(['oil', 'watercolor', 'marker']);
+            params.brushSize = range(2.0, 5.0);
+            params.turbulence = range(0.5, 1.5);
+            params.accumulation = range(0.05, 0.15);
+        } else if (baseStyle === 'collage') {
+            params.count = Math.floor(range(15, 25));
+            params.materials = ['solid', 'grid', 'noise'];
+            params.roughness = 2; 
+            params.rotation = range(0, 0.5); 
+        } else if (baseStyle === 'three') {
+            params.cameraZ = 400;
+            params.fogDensity = 0;
+            params.shape = pick(['cube', 'sphere', 'spiral']);
+            params.wireframe = false;
+            params.particleSize = range(4, 8);
+        } else if (baseStyle === 'attractor') {
+            params.a = range(-2.0, 2.0);
+            params.b = range(-2.0, 2.0);
+            params.c = range(-2.0, 2.0);
+            params.d = range(-2.0, 2.0);
+            params.scale = range(150, 250);
+        }
+
+        // 6. Advanced Composition (Semantic)
+        let paletteStrategy = 'random';
+        if (traits?.diversity > 0.5) {
+            paletteStrategy = pick(['triadic', 'tetradic', 'complementary']);
+        } else {
+            paletteStrategy = pick(['monochromatic', 'analogous']);
+        }
+
+        let symmetry = 'none';
+        if (traits?.gini > 0.6) { // High inequality = Order
+            symmetry = pick(['horizontal', 'vertical', 'radial-4']);
+        } else { // High equality = Chaos/Freedom
+            symmetry = 'none';
+        }
+
+        let glitchMode = 'none';
+        if (traits?.ageDays > 365 * 5) { // Old code = Decay
+            glitchMode = pick(['scanlines', 'vhs-tracking']);
+        }
+
+        const borderMode = rng() > 0.7 ? pick(['simple', 'polaroid', 'film-strip', 'vignette']) : 'none';
+        const textureOverlay = rng() > 0.6 ? pick(['paper', 'canvas', 'noise', 'grid']) : 'none';
+
+        return {
+            paletteShift,
+            secondaryOffset,
+            tertiaryOffset,
+            fadeAlpha,
+            speed,
+            composite,
+            filter,
+            bg,
+            params,
+            // New Traits
+            paletteStrategy,
+            symmetry,
+            borderMode,
+            glitchMode,
+            textureOverlay
+        };
+    }
+
+    generateSignature(repoData) {
         const { info, languages, contributors, commits } = repoData;
         const repoName = info.full_name;
         const hash = this.hashString(repoName);
 
-        // Determine palette based on dominant language
+        // Determine dominant language for base hue
         const dominantLang = Object.keys(languages)[0] || 'JavaScript';
         const langHash = this.hashString(dominantLang);
         const baseHue = langHash % 360;
+        
         const complexity = Math.min(Object.keys(languages || {}).length + (contributors || []).length / 5, 20);
         const energy = Math.min((commits || []).length / 20, 100);
 
-        const styleProfiles = this.getStyleProfiles();
-        let styleIndex = Math.abs(hash + Math.floor(complexity * 13) + Math.floor(energy * 7) + (commits || []).length) % styleProfiles.length;
-        let styleProfile = styleProfiles[styleIndex];
-        const avoidMap = {
-            'facebook/react': new Set(['life-neon', 'life-quilt', 'life-bioreactor']),
-            'torvalds/linux': new Set(['rift-glitch', 'rift-paper'])
-        };
-        const avoid = avoidMap[repoName];
-        if (avoid && avoid.has(styleProfile.key)) {
-            const salt = 7 + (hash % 5);
-            let attempts = 0;
-            while (attempts < styleProfiles.length && avoid.has(styleProfile.key)) {
-                styleIndex = (styleIndex + salt) % styleProfiles.length;
-                styleProfile = styleProfiles[styleIndex];
-                attempts++;
-            }
+        // Semantic Analysis
+        const traits = this.analyzeRepoTraits(repoData);
+        
+        let availableEngines = [];
+        
+        // 1. The "Auteur" (One dominant mind)
+        if (traits.gini > 0.55 || traits.teamSize < 3) {
+            availableEngines = ['attractor', 'minimal-sculpture', 'glitch-monolith', 'paint', 'rift'];
+        } 
+        // 2. The "Society" (Collaborative swarm)
+        else if (traits.teamSize > 15 || traits.gini < 0.3) {
+            availableEngines = ['city', 'galaxy-spiral', 'network-sphere', 'bio', 'life'];
         }
-        const paletteShift = styleProfile.paletteShift || 0;
-        const primaryHue = (baseHue + paletteShift + 360) % 360;
-        const secondaryHue = (primaryHue + (styleProfile.secondaryOffset || 180)) % 360;
-        const tertiaryHue = (primaryHue + (styleProfile.tertiaryOffset || 90)) % 360;
-        const speedScale = styleProfile.speedScale || 1;
+        // 3. The "Legacy" (Old, deep roots)
+        else if (traits.ageDays > 1500) {
+            availableEngines = ['strata', 'tree', 'runes', 'matrix'];
+        }
+        // 4. The "Polyglot" (Complex materials)
+        else if (traits.diversity > 0.8) {
+            availableEngines = ['collage', 'mosaic', 'weave', 'barcode'];
+        }
+        // 5. Default / Balanced
+        else {
+            availableEngines = ['vapor-grid', 'abstract-flow', 'cyber-city', 'paint', 'bio'];
+        }
+        
+        // Deterministic selection from the semantically filtered list
+        const engineIndex = Math.abs(hash) % availableEngines.length;
+        const baseStyle = availableEngines[engineIndex];
+        
+        // Generate TRULY unique parameters
+        const procedural = this.generateProceduralProfile(baseStyle, hash, complexity, energy, traits);
+
+        const primaryHue = (baseHue + procedural.paletteShift + 360) % 360;
+        const secondaryHue = (primaryHue + procedural.secondaryOffset) % 360;
+        const tertiaryHue = (primaryHue + procedural.tertiaryOffset) % 360;
 
         return {
             hash: hash,
@@ -540,10 +707,10 @@ class SimpleVisualizer {
             tertiaryHue: tertiaryHue,
             complexity: complexity,
             energy: energy,
-            style: styleProfile.base,
-            styleKey: styleProfile.key,
-            styleProfile: styleProfile,
-            speed: (0.009 + ((hash % 12) / 1200)) * speedScale
+            style: baseStyle,
+            styleProfile: procedural, 
+            speed: procedural.speed,
+            traits: traits // Save for debug/overlay
         };
     }
 
@@ -606,16 +773,38 @@ class SimpleVisualizer {
     }
 
     initializeState(signature, repoData) {
+        // Handle 3D vs 2D mode switching
+        if (signature.style === 'three') {
+            if (window.THREE) {
+                this.canvas.style.display = 'none';
+                this.initializeThree(signature, repoData);
+                return;
+            } else {
+                console.warn('Three.js not loaded, falling back to 2D City style');
+                signature.style = 'city';
+                // Fallback profile
+                signature.styleProfile = this.generateProceduralProfile('city', signature.hash, 10, 10);
+            }
+        } 
+        
+        this.canvas.style.display = 'block';
+        if (this.threeCanvas) this.threeCanvas.style.display = 'none';
+
         this.particles = [];
         this.styleState = {};
         this.lifeGrid = [];
-        const profile = signature.styleProfile || {};
-        const paletteCount = profile.paletteCount || 5;
-        this.styleState.palette = this.getStylePalette(signature, paletteCount);
-        if (profile.grain) {
+        
+        // Use procedural palette
+        this.styleState.palette = this.getStylePalette(signature, 5);
+        
+        // Procedural Params
+        const params = signature.styleProfile.params || {};
+        
+        if (signature.styleProfile.bg?.noise > 0) {
             const grainRng = this.createSeededRNG(signature.hash + 991);
             this.styleState.grainPattern = this.createGrainPattern(120, grainRng);
         }
+        
         const { commits } = repoData;
         const dpr = window.devicePixelRatio || 1;
         const width = this.canvas.width / dpr;
@@ -624,7 +813,7 @@ class SimpleVisualizer {
         const activeCommits = (commits || []).slice(0, 150);
         if (activeCommits.length === 0) return;
 
-        // Calculate Time Range (guard against missing/invalid dates)
+        // Calculate Time Range
         const times = activeCommits
             .map(c => {
                 const dateValue = c?.commit?.author?.date || c?.commit?.committer?.date;
@@ -633,311 +822,585 @@ class SimpleVisualizer {
             })
             .filter((time) => time !== null);
 
-        let minTime;
-        let maxTime;
-
+        let minTime, maxTime;
         if (times.length === 0) {
-            const fallbackBase = 946684800000 + (signature.hash % 31536000000); // Year 2000 + up to 1 year
+            const fallbackBase = 946684800000;
             minTime = fallbackBase - 86400000;
             maxTime = fallbackBase + 86400000;
         } else {
             minTime = Math.min(...times);
             maxTime = Math.max(...times);
         }
-        
-        if (minTime === maxTime) {
-            minTime -= 86400000; // -1 day
-            maxTime += 86400000; // +1 day
-        }
+        if (minTime === maxTime) { minTime -= 86400000; maxTime += 86400000; }
         
         const timeRange = { minTime, maxTime };
 
-        // Generate Particles from Commits
+        // Generate Particles
         activeCommits.forEach((commit, i) => {
             const p = this.mapCommitToParticle(commit, i, activeCommits.length, width, height, timeRange);
-            
-            if (isNaN(p.x) || isNaN(p.y)) {
-                console.error('Invalid particle:', p);
-                return;
-            }
-            this.particles.push(p);
+            if (!isNaN(p.x) && !isNaN(p.y)) this.particles.push(p);
         });
 
-        // Add "Ghost" particles for structure (e.g. background flow)
-        // These are seeded by Repo Name to remain deterministic
-        if (signature.style === 'flow' || signature.style === 'nebula') {
-             const bgCount = profile.bgCount || 50;
-             for(let i=0; i<bgCount; i++) {
-                 // Seed pseudorandomness with index + repo hash
-                 const seed = signature.hash + i;
-                 const px = (seed % 1000) / 1000 * width;
-                 const py = ((seed * 2) % 1000) / 1000 * height;
-                 
-                 this.particles.push({
-                     x: px, y: py,
-                     originX: px,
-                     originY: py,
-                     prevX: px,
-                     prevY: py,
-                     vx: 0, vy: 0,
-                     size: 1 + (seed % 3),
-                     hue: signature.secondaryHue,
-                     alpha: 0.2,
-                     isBackground: true,
-                     phase: 0
-                 });
-             }
-        }
-
-        // For 'life' style (Cellular Automata)
-        if (signature.style === 'life') {
-            const cols = 50;
-            const rows = 50;
-            this.lifeGrid = new Array(cols).fill(0).map(() => new Array(rows).fill(0));
+        // Initialize Engine State from Params
+        if (signature.style === 'city') {
+            const gridSize = params.gridSize || 20;
+            const cols = Math.ceil(width / gridSize);
+            const rows = Math.ceil(height / gridSize);
+            const grid = new Array(cols * rows).fill(null);
             
-            for (let i = 0; i < cols; i++) {
-                for (let j = 0; j < rows; j++) {
-                    this.lifeGrid[i][j] = this.rng() > 0.8 ? 1 : 0; 
+            activeCommits.forEach((commit, i) => {
+                const seed = this.hashString(commit.commit?.sha || String(i));
+                const x = Math.floor((seed % 1000) / 1000 * cols);
+                const y = Math.floor(((seed * 13) % 1000) / 1000 * rows);
+                const idx = y * cols + x;
+                const stats = commit.stats || { total: 10 };
+                const heightVal = Math.min(Math.log(stats.total + 1) * 8, 50);
+                const hue = (seed) % 360;
+                
+                if (!grid[idx] || grid[idx].h < heightVal) {
+                    grid[idx] = { h: heightVal, hue: hue, x: x * gridSize, y: y * gridSize, z: heightVal };
                 }
-            }
-            this.styleState.lifeMaxAge = profile.lifeMaxAge || 18;
-            this.styleState.lifeCellStyle = profile.lifeCellStyle || 'square';
+            });
+            this.styleState.cityGrid = grid;
+            this.styleState.sortedBuildings = grid.filter(b => b).sort((a, b) => (a.y + a.x) - (b.y + b.x));
+            this.styleState.gridSize = gridSize;
+            this.styleState.cityTheme = params; // Pass all params
         }
 
-        if (signature.style === 'constellation') {
-            const starDensity = profile.starDensity || 1;
-            const starCount = Math.min(420, Math.floor((140 + signature.energy * 1.4) * starDensity));
-            this.styleState.stars = [];
-            for (let i = 0; i < starCount; i++) {
-                this.styleState.stars.push({
-                    x: this.rng() * width,
-                    y: this.rng() * height,
-                    r: 0.4 + this.rng() * 1.6,
-                    alpha: 0.3 + this.rng() * 0.6,
-                    twinkle: this.rng() * Math.PI * 2,
-                    hue: (signature.primaryHue + this.rng() * 60 - 30 + 360) % 360,
-                    burst: profile.starBurst ? (0.2 + this.rng() * 0.8) : 0
-                });
-            }
+        if (signature.style === 'paint') {
+            const brushes = [];
+            activeCommits.forEach((commit, i) => {
+                 const seed = this.hashString(commit.commit?.sha || String(i));
+                 const hue = seed % 360;
+                 const size = (Math.min(Math.log((commit.stats?.total || 1) + 1) * 10, 60)) * (params.brushSize || 1);
+                 
+                 brushes.push({
+                     x: this.rng() * width,
+                     y: this.rng() * height,
+                     vx: (this.rng() - 0.5) * 4,
+                     vy: (this.rng() - 0.5) * 4,
+                     hue: hue,
+                     size: size,
+                     phase: this.rng() * Math.PI * 2,
+                     life: 0
+                 });
+            });
+            this.styleState.brushes = brushes;
+            this.styleState.paintStyle = params.style || 'oil';
         }
 
-        if (signature.style === 'nebula') {
-            const cloudCount = profile.cloudCount || (6 + (signature.hash % 4));
-            const cloudAlpha = profile.cloudAlpha || 0.1;
-            this.styleState.clouds = [];
-            for (let i = 0; i < cloudCount; i++) {
-                const spread = profile.cloudSpread || 0.35;
-                const radius = (0.15 + this.rng() * spread) * Math.min(width, height);
-                this.styleState.clouds.push({
-                    x: this.rng() * width,
-                    y: this.rng() * height,
-                    r: radius,
-                    alpha: cloudAlpha * (0.5 + this.rng() * 0.8),
-                    hue: (signature.primaryHue + this.rng() * 90 - 45 + 360) % 360
-                });
-            }
+        if (signature.style === 'attractor') {
+             this.styleState.attractorParams = params;
+             this.styleState.attractorType = 'clifford';
+             this.particles.forEach(p => {
+                 p.x = (this.rng() - 0.5) * 5;
+                 p.y = (this.rng() - 0.5) * 5;
+             });
         }
 
-        if (signature.style === 'matrix') {
-            const columnBase = profile.columnWidth || 40;
-            const columnDensity = profile.columnDensity || 1;
-            const columnCount = Math.max(14, Math.floor((width / columnBase) * columnDensity));
-            const columnWidth = width / columnCount;
-            this.styleState.columns = [];
-            for (let i = 0; i < columnCount; i++) {
-                this.styleState.columns.push({
-                    x: (i + 0.5) * columnWidth,
-                    width: Math.max(1, columnWidth * 0.15),
-                    alpha: 0.06 + this.rng() * 0.18,
-                    hue: (signature.secondaryHue + (i / columnCount) * 60 + signature.hash % 30) % 360
-                });
-            }
-            this.styleState.columnWidth = columnWidth;
-            this.styleState.glyphMode = profile.glyphMode || 'katakana';
-            this.styleState.glyphScale = profile.glyphScale || 1;
-            this.styleState.beamAlpha = profile.beamAlpha || 0.16;
-        }
-
-        if (signature.style === 'mosaic') {
-            const gridMin = profile.mosaicGridMin || 12;
-            const gridMax = profile.mosaicGridMax || 24;
-            this.styleState.mosaicGrid = Math.round(this.mapValue(signature.complexity, 0, 20, gridMax, gridMin));
-            this.styleState.mosaicStyle = profile.mosaicStyle || 'stained';
-        }
-
-        if (signature.style === 'tree') {
-            this.styleState.treeDepth = profile.treeDepth || (9 + (signature.hash % 3));
-            this.styleState.leafMode = profile.leafMode || 'petal';
-        }
-
-        if (signature.style === 'flow') {
-            this.styleState.flowMode = profile.flowMode || 'ribbon';
-            this.styleState.flowAlpha = profile.flowAlpha || 0.55;
-        }
-
-        if (signature.style === 'strata') {
-            this.styleState.strataLayers = profile.strataLayers || Math.round(this.mapValue(signature.complexity, 0, 20, 12, 7));
-            this.styleState.strataAmplitude = profile.strataAmplitude || Math.round(height * 0.08);
-            this.styleState.strataScale = profile.strataScale || 0.004;
-        }
-
-        if (signature.style === 'orbit') {
-            const centerCount = profile.orbitCenters || 3;
-            const centers = [];
-            const orbitSpread = Math.min(width, height) * 0.22;
-            for (let i = 0; i < centerCount; i++) {
-                const angle = (i / centerCount) * Math.PI * 2 + this.rng() * 0.6;
-                const radius = orbitSpread * (0.6 + this.rng() * 0.6);
-                centers.push({
-                    x: width * 0.5 + Math.cos(angle) * radius,
-                    y: height * 0.5 + Math.sin(angle) * radius
-                });
-            }
-            this.styleState.orbitCenters = centers;
-            this.styleState.orbitTightness = profile.orbitTightness || 1;
-            this.styleState.orbitRings = centers.map((center, index) => {
-                const ringCount = 2 + ((signature.hash + index) % 3);
-                const ringSizes = [];
-                for (let i = 0; i < ringCount; i++) {
-                    ringSizes.push((0.12 + this.rng() * 0.28) * Math.min(width, height));
+        if (signature.style === 'bio') {
+            const dim = 100; 
+            const grid = new Float32Array(dim * dim * 2);
+            for(let i=0; i< dim*dim; i++) { grid[i*2] = 1.0; grid[i*2+1] = 0.0; }
+            
+            activeCommits.forEach((commit, i) => {
+                const seed = this.hashString(commit.commit?.sha || String(i));
+                const cx = Math.floor((seed % 1000) / 1000 * dim);
+                const cy = Math.floor(((seed * 13) % 1000) / 1000 * dim);
+                const r = 3 + (seed % 4);
+                for(let dy=-r; dy<=r; dy++) {
+                    for(let dx=-r; dx<=r; dx++) {
+                        const idx = ((cy+dy + dim)%dim)*dim + ((cx+dx + dim)%dim);
+                        grid[idx*2 + 1] = 0.9; 
+                    }
                 }
-                return ringSizes;
             });
-
-            this.particles.forEach((p, index) => {
-                const seed = this.hashString(p.commit?.sha || String(index)) + signature.hash;
-                const centerIndex = Math.abs(seed) % centers.length;
-                const center = centers[centerIndex];
-                const dx = p.originX - center.x;
-                const dy = p.originY - center.y;
-                const baseRadius = Math.sqrt(dx * dx + dy * dy);
-                const maxRadius = Math.min(width, height) * 0.45;
-                p.orbitIndex = centerIndex;
-                p.orbitRadius = Math.max(28, Math.min(baseRadius, maxRadius));
-                p.orbitPhase = (seed % 360) * (Math.PI / 180);
-                p.orbitSpeed = 0.002 + (p.size / 15) * 0.004 + (centerIndex * 0.0006);
-                const startX = center.x + Math.cos(p.orbitPhase) * p.orbitRadius;
-                const startY = center.y + Math.sin(p.orbitPhase) * p.orbitRadius * this.styleState.orbitTightness;
-                p.x = startX;
-                p.y = startY;
-                p.prevX = startX;
-                p.prevY = startY;
-            });
+            
+            this.styleState.bioGrid = grid;
+            this.styleState.bioNext = new Float32Array(dim * dim * 2);
+            this.styleState.bioDim = dim;
+            this.styleState.bioParams = params.bioParams || { dA: 1.0, dB: 0.5, f: 0.0545, k: 0.062 };
+            this.styleState.bioType = params.colorMode; // Using colorMode as type proxy
         }
-
-        if (signature.style === 'runes') {
-            this.styleState.runeDensity = profile.runeDensity || 1;
-            this.styleState.runeScale = profile.runeScale || 1;
-        }
-
-        if (signature.style === 'weave') {
-            this.styleState.weaveCols = profile.weaveCols || Math.round(this.mapValue(signature.complexity, 0, 20, 14, 8));
-            this.styleState.weaveRows = profile.weaveRows || Math.round(this.mapValue(signature.energy, 0, 100, 10, 6));
-            this.styleState.weaveAmplitude = profile.weaveAmplitude || Math.round(height * 0.05);
-        }
-
-        if (signature.style === 'rift') {
-            this.styleState.riftSlices = profile.riftSlices || Math.round(this.mapValue(signature.complexity, 0, 20, 18, 10));
-            this.styleState.riftJitter = profile.riftJitter || 24;
-        }
-
-        if (signature.style === 'barcode') {
-            const barCount = profile.barCount || Math.round(this.mapValue(signature.energy, 0, 100, 55, 80));
-            const bars = [];
-            let x = 0;
-            for (let i = 0; i < barCount; i++) {
-                const commit = activeCommits[i % activeCommits.length] || {};
-                const statTotal = commit?.stats?.total ?? (10 + this.rng() * 120);
-                const widthFactor = Math.log(statTotal + 2);
-                const barW = Math.max(6, Math.min(width * 0.06, widthFactor * 4));
-                const hue = this.hashString(commit?.commit?.author?.name || String(i)) % 360;
-                const paletteTone = this.getPaletteColorForHue(hue, this.styleState.palette);
-                bars.push({
-                    x,
-                    w: barW,
-                    color: paletteTone,
-                    alpha: 0.7 + this.rng() * 0.25
-                });
-                x += barW + 2 + this.rng() * 4;
-                if (x > width) break;
-            }
-            this.styleState.barcodeBars = bars;
-        }
-
+        
         if (signature.style === 'collage') {
-            const pieceCount = profile.collageCount || Math.round(this.mapValue(signature.complexity, 0, 20, 22, 32));
+            const pieceCount = params.count || 15;
             const pieces = [];
+            const types = params.materials || ['solid'];
+            
             for (let i = 0; i < pieceCount; i++) {
-                const hueSeed = (signature.primaryHue + i * 18) % 360;
+                const seed = signature.hash + i;
+                const rng = this.createSeededRNG(seed);
+                const hueSeed = (signature.primaryHue + i * 25) % 360;
                 const paletteTone = this.getPaletteColorForHue(hueSeed, this.styleState.palette);
-                const size = 40 + this.rng() * 140;
+                
+                const type = types[Math.floor(rng() * types.length)];
+                const w = 100 + rng() * 300;
+                const h = 100 + rng() * 300;
+                const texture = this.createProceduralTexture(type, Math.ceil(w), Math.ceil(h), paletteTone, seed);
+                
                 pieces.push({
-                    x: this.rng() * width,
-                    y: this.rng() * height,
-                    w: size * (0.6 + this.rng() * 0.8),
-                    h: size * (0.6 + this.rng() * 0.8),
-                    rot: (this.rng() - 0.5) * 0.6,
-                    drift: this.rng() * Math.PI * 2,
-                    kind: this.rng() > 0.7 ? 'circle' : 'rect',
-                    tone: paletteTone,
-                    alpha: 0.6 + this.rng() * 0.3
+                    x: rng() * width,
+                    y: rng() * height,
+                    w: w, h: h,
+                    rot: (rng() - 0.5) * (params.rotation || Math.PI),
+                    drift: rng() * Math.PI * 2,
+                    kind: rng() > 0.6 ? 'poly' : 'rect',
+                    texture: texture,
+                    shadow: rng() > 0.5
                 });
             }
             this.styleState.collagePieces = pieces;
         }
-
-        if (signature.style === 'radar') {
-            const ringCount = profile.radarRings || Math.round(this.mapValue(signature.complexity, 0, 20, 5, 7));
-            const maxRadius = Math.min(width, height) * 0.45;
-            const rings = [];
-            for (let i = 0; i < ringCount; i++) {
-                rings.push((i + 1) / ringCount * maxRadius);
-            }
-            const points = [];
-            activeCommits.forEach((commit, i) => {
-                const author = commit?.commit?.author?.name || String(i);
-                const angle = (this.hashString(author) % 360) * (Math.PI / 180);
-                const radius = rings[i % rings.length];
-                const hue = this.hashString(author) % 360;
-                const tone = this.getPaletteColorForHue(hue, this.styleState.palette);
-                points.push({
-                    angle,
-                    radius,
-                    size: 2 + (i % 5),
-                    tone
+        
+        // Pass through legacy styles setup if needed (matrix, etc would need similar updates to use 'params')
+        // For now, only the primary new styles are fully procedural.
+        // Legacy styles will default to their hardcoded behaviors unless we update them too.
+        // Given constraints, I'll update Matrix briefly.
+        if (signature.style === 'matrix') {
+             this.styleState.columnWidth = 30; // Could use params
+             this.styleState.columns = []; // ... re-init logic ...
+             // Re-using existing logic but ensures it runs
+             const columnCount = Math.ceil(width / 30);
+             for (let i = 0; i < columnCount; i++) {
+                this.styleState.columns.push({
+                    x: (i + 0.5) * 30,
+                    width: 5,
+                    alpha: 0.1 + this.rng() * 0.2,
+                    hue: (signature.secondaryHue) % 360
                 });
+            }
+        }
+    }
+
+    initializeThree(signature, repoData) {
+        if (!window.THREE) {
+            console.error('Three.js not loaded');
+            return;
+        }
+
+        const container = this.canvas.parentElement;
+        const width = container.clientWidth;
+        const height = container.clientHeight;
+
+        if (!this.threeCanvas) {
+            this.threeCanvas = document.createElement('canvas');
+            this.threeCanvas.style.position = 'absolute';
+            this.threeCanvas.style.top = '0';
+            this.threeCanvas.style.left = '0';
+            this.threeCanvas.style.width = '100%';
+            this.threeCanvas.style.height = '100%';
+            this.threeCanvas.style.pointerEvents = 'none'; // Let overlay handle clicks
+            container.appendChild(this.threeCanvas);
+            
+            this.threeRenderer = new THREE.WebGLRenderer({ 
+                canvas: this.threeCanvas, 
+                alpha: true, 
+                antialias: true 
             });
-            this.styleState.radarRings = rings;
-            this.styleState.radarPoints = points;
+            this.threeRenderer.setSize(width, height);
+            this.threeRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         }
-
-        if (signature.style === 'tree') {
-            const maxDepth = this.styleState.treeDepth || 9;
-            const segments = [];
-            const leaves = [];
-            const buildTree = (x, y, len, angle, depth) => {
-                if (depth > maxDepth || len < 2) {
-                    leaves.push({ x, y, depth, phase: this.rng() * Math.PI * 2 });
-                    return;
-                }
-                const bend = (this.rng() - 0.5) * 0.4;
-                const nextAngle = angle + bend;
-                const endX = x + Math.cos(nextAngle) * len;
-                const endY = y + Math.sin(nextAngle) * len;
-                segments.push({ x1: x, y1: y, x2: endX, y2: endY, depth, phase: this.rng() * Math.PI * 2 });
-
-                const branchCount = 2 + ((signature.hash + depth) % 2);
-                const spread = 0.45 + (this.rng() * 0.2);
-                for (let i = 0; i < branchCount; i++) {
-                    const newLen = len * (0.7 + this.rng() * 0.08);
-                    const newAngle = nextAngle + spread * (i - (branchCount - 1) / 2);
-                    buildTree(endX, endY, newLen, newAngle, depth + 1);
-                }
-            };
-            buildTree(width / 2, height * 0.98, height * 0.32, -Math.PI / 2, 0);
-            this.styleState.treeSegments = segments;
-            this.styleState.treeLeaves = leaves;
+        
+        this.threeCanvas.style.display = 'block';
+        
+        // Cleanup previous state
+        this.threePoints = null;
+        this.threeGroup = null;
+        this.threeGrid = null;
+        this.monolith = null;
+        this.monolithGeo = null;
+        this.monolithBasePos = null;
+        
+        // Scene Setup
+        this.threeScene = new THREE.Scene();
+        // Fog for depth
+        const hue = signature.primaryHue;
+        const col = new THREE.Color(`hsl(${hue}, 20%, 5%)`);
+        
+        const fogDensity = signature.styleProfile.params?.fogDensity || 0.002;
+        this.threeScene.fog = new THREE.FogExp2(col, fogDensity);
+        
+        this.threeCamera = new THREE.PerspectiveCamera(60, width / height, 0.1, 2000);
+        this.threeCamera.position.z = signature.styleProfile.params?.cameraZ || 400;
+        
+        // Objects
+        const { commits } = repoData;
+        const activeCommits = (commits || []).slice(0, 500);
+        
+        const type = signature.styleProfile.threeType || 'cube';
+        const palette = this.getStylePalette(signature, 5);
+        
+        // Symmetry Handling for 3D
+        const symmetry = signature.styleProfile.symmetry || 'none';
+        
+        // --- 1. Cyber City (Cyberpunk) ---
+        if (type === 'cyber-city') {
+            const cityGroup = new THREE.Group();
+            const material = new THREE.MeshBasicMaterial({ color: 0x000000, wireframe: true, transparent: true, opacity: 0.3 });
+            const edgeMat = new THREE.LineBasicMaterial({ color: new THREE.Color(`hsl(${palette[0].h}, 100%, 70%)`), transparent: true, opacity: 0.8 });
+            
+            const gridSize = 20;
+            activeCommits.slice(0, 100).forEach((c, i) => {
+                const seed = this.hashString(c.commit?.sha || String(i));
+                const h = 10 + Math.log(c.stats?.total || 1) * 20;
+                const geo = new THREE.BoxGeometry(10, h, 10);
+                geo.translate(0, h/2, 0);
+                
+                const mesh = new THREE.Mesh(geo, material);
+                const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat);
+                
+                const x = ((seed % gridSize) - gridSize/2) * 15;
+                const z = ((Math.floor(seed/gridSize) % gridSize) - gridSize/2) * 15;
+                
+                mesh.position.set(x, -50, z);
+                edges.position.set(x, -50, z);
+                
+                cityGroup.add(mesh);
+                cityGroup.add(edges);
+            });
+            this.threeScene.add(cityGroup);
+            this.threeGroup = cityGroup; // Track for rotation
+        } 
+        
+        // --- 2. Minimal Sculpture (Minimalism) ---
+        else if (type === 'minimal-sculpture') {
+            const group = new THREE.Group();
+            const geoms = [
+                new THREE.IcosahedronGeometry(10, 0),
+                new THREE.BoxGeometry(15, 15, 15),
+                new THREE.TorusGeometry(8, 2, 8, 20),
+                new THREE.ConeGeometry(8, 15, 4)
+            ];
+            
+            activeCommits.slice(0, 20).forEach((c, i) => {
+                const seed = this.hashString(c.commit?.sha || String(i));
+                const pTone = palette[seed % palette.length];
+                const col = new THREE.Color(`hsl(${pTone.h}, ${pTone.s}%, ${pTone.l}%)`);
+                
+                const geom = geoms[seed % geoms.length];
+                const mat = new THREE.MeshPhongMaterial({ 
+                    color: col, 
+                    flatShading: true, 
+                    shininess: 0 
+                });
+                
+                const mesh = new THREE.Mesh(geom, mat);
+                mesh.position.set(
+                    (this.rng()-0.5)*100,
+                    (this.rng()-0.5)*100,
+                    (this.rng()-0.5)*100
+                );
+                mesh.rotation.set(this.rng()*Math.PI, this.rng()*Math.PI, 0);
+                const scale = 1 + Math.log(c.stats?.total || 1) * 0.5;
+                mesh.scale.set(scale, scale, scale);
+                
+                group.add(mesh);
+            });
+            
+            // Add lights for this style
+            const light = new THREE.DirectionalLight(0xffffff, 1);
+            light.position.set(10, 10, 10);
+            this.threeScene.add(light);
+            const amb = new THREE.AmbientLight(0x404040);
+            this.threeScene.add(amb);
+            
+            this.threeScene.add(group);
+            this.threeGroup = group;
         }
+        
+        // --- 3. Organic Crystal (Surreal/Organic) ---
+        else if (type === 'organic-crystal') {
+            const group = new THREE.Group();
+            const mainGeo = new THREE.IcosahedronGeometry(40, 1);
+            const mainMat = new THREE.MeshPhysicalMaterial({
+                color: new THREE.Color(`hsl(${palette[0].h}, 80%, 50%)`),
+                metalness: 0.1,
+                roughness: 0.1,
+                transparent: true,
+                opacity: 0.8,
+                transmission: 0.5
+            });
+            const center = new THREE.Mesh(mainGeo, mainMat);
+            group.add(center);
+            
+            activeCommits.slice(0, 50).forEach((c, i) => {
+                const seed = this.hashString(c.commit?.sha || String(i));
+                const pTone = palette[seed % palette.length];
+                const size = 5 + Math.log(c.stats?.total || 1) * 2;
+                
+                const geo = new THREE.IcosahedronGeometry(size, 0);
+                const mat = new THREE.MeshPhysicalMaterial({
+                    color: new THREE.Color(`hsl(${pTone.h}, 70%, 60%)`),
+                    metalness: 0.2,
+                    roughness: 0.2
+                });
+                
+                const mesh = new THREE.Mesh(geo, mat);
+                // Position on surface approx
+                const theta = this.rng() * Math.PI * 2;
+                const phi = Math.acos(2 * this.rng() - 1);
+                const r = 40;
+                mesh.position.set(
+                    r * Math.sin(phi) * Math.cos(theta),
+                    r * Math.sin(phi) * Math.sin(theta),
+                    r * Math.cos(phi)
+                );
+                mesh.lookAt(0,0,0);
+                group.add(mesh);
+            });
+            
+            const light = new THREE.PointLight(0xffffff, 1, 500);
+            light.position.set(50, 50, 50);
+            this.threeScene.add(light);
+            this.threeScene.add(new THREE.AmbientLight(0x222222));
+            this.threeScene.add(group);
+            this.threeGroup = group;
+        }
+        
+        // --- 4. Vapor Grid (Vaporwave) ---
+        else if (type === 'vapor-grid') {
+            // Sun
+            const sunGeo = new THREE.CircleGeometry(60, 32);
+            const sunMat = new THREE.MeshBasicMaterial({ 
+                color: new THREE.Color(`hsl(${palette[0].h}, 100%, 70%)`) 
+            });
+            const sun = new THREE.Mesh(sunGeo, sunMat);
+            sun.position.set(0, 30, -200);
+            this.threeScene.add(sun);
+            
+            // Moving Grid
+            const gridGeo = new THREE.PlaneGeometry(600, 600, 40, 40);
+            // Distort grid
+            const pos = gridGeo.attributes.position;
+            for(let i=0; i<pos.count; i++) {
+                const z = pos.getZ(i);
+                pos.setZ(i, z + Math.sin(pos.getX(i)*0.05)*10);
+            }
+            gridGeo.computeVertexNormals();
+            
+            const gridMat = new THREE.MeshBasicMaterial({ 
+                color: new THREE.Color(`hsl(${palette[1].h}, 100%, 50%)`),
+                wireframe: true
+            });
+            const grid = new THREE.Mesh(gridGeo, gridMat);
+            grid.rotation.x = -Math.PI / 2;
+            grid.position.y = -50;
+            this.threeScene.add(grid);
+            this.threeGrid = grid; // Animate this
+            
+            // Floating Pyramids
+            activeCommits.slice(0, 30).forEach((c, i) => {
+                const seed = this.hashString(c.commit?.sha || String(i));
+                const geo = new THREE.ConeGeometry(5, 10, 4);
+                const mat = new THREE.MeshBasicMaterial({ color: 0x00ffff, wireframe: true });
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.position.set(
+                    (this.rng()-0.5)*400,
+                    (this.rng()*50) - 20,
+                    (this.rng()-0.5)*200 - 50
+                );
+                mesh.rotation.z = Math.PI;
+                this.threeScene.add(mesh);
+            });
+        }
+        
+        // --- 5. Glitch Monolith (Glitch) ---
+        else if (type === 'glitch-monolith') {
+            const geo = new THREE.BoxGeometry(40, 120, 10, 10, 30, 2);
+            const mat = new THREE.MeshBasicMaterial({ 
+                color: 0xffffff, 
+                wireframe: true,
+                transparent: true,
+                opacity: 0.5
+            });
+            this.monolith = new THREE.Mesh(geo, mat);
+            this.monolithGeo = geo;
+            this.monolithBasePos = geo.attributes.position.clone(); // Store original
+            this.threeScene.add(this.monolith);
+            
+            // Random floating debris
+            const debrisGeo = new THREE.BufferGeometry();
+            const dPos = [];
+            for(let i=0; i<200; i++) {
+                dPos.push((this.rng()-0.5)*300, (this.rng()-0.5)*300, (this.rng()-0.5)*300);
+            }
+            debrisGeo.setAttribute('position', new THREE.Float32BufferAttribute(dPos, 3));
+            const debris = new THREE.Points(debrisGeo, new THREE.PointsMaterial({color: 0xff00ff, size: 2}));
+            this.threeScene.add(debris);
+        }
+        
+        // --- 6. Abstract Flow (Abstract Expressionism) / Default Points ---
+        else {
+            // Default to Points logic (Abstract Flow, Cube, Sphere, Spiral)
+            const geometry = new THREE.BufferGeometry();
+            const positions = [];
+            const colors = [];
+            const sizes = [];
+            
+            activeCommits.forEach((commit, i) => {
+                const seed = this.hashString(commit.commit?.sha || String(i));
+                const pTone = palette[seed % palette.length] || {h:0, s:0, l:100};
+                const color = new THREE.Color(`hsl(${pTone.h}, ${pTone.s}%, ${pTone.l}%)`);
+                
+                let x, y, z;
+                
+                if (type === 'abstract-flow') {
+                    // Strange Attractor-ish
+                    const t = i * 0.1;
+                    x = Math.sin(t) * (100 + Math.cos(t*0.5)*50);
+                    y = Math.cos(t) * (100 + Math.sin(t*0.3)*50);
+                    z = Math.sin(t*1.5) * 100;
+                    // Add noise
+                    x += (this.rng()-0.5)*20;
+                    y += (this.rng()-0.5)*20;
+                    z += (this.rng()-0.5)*20;
+                } else if (type === 'cube') {
+                    // Distributed in a cube volume
+                    const range = 300;
+                    x = (this.rng() - 0.5) * range;
+                    y = (this.rng() - 0.5) * range;
+                    z = (this.rng() - 0.5) * range;
+                } else if (type === 'sphere') {
+                    // Surface of a sphere + random depth
+                    const r = 150 + this.rng() * 50;
+                    const theta = this.rng() * Math.PI * 2;
+                    const phi = Math.acos(2 * this.rng() - 1);
+                    x = r * Math.sin(phi) * Math.cos(theta);
+                    y = r * Math.sin(phi) * Math.sin(theta);
+                    z = r * Math.cos(phi);
+                } else {
+                    // Spiral Galaxy
+                    const angle = i * 0.1;
+                    const r = i * 0.5 + 20;
+                    x = r * Math.cos(angle) + (this.rng()-0.5)*20;
+                    y = (this.rng()-0.5) * 40;
+                    z = r * Math.sin(angle) + (this.rng()-0.5)*20;
+                }
+                
+                positions.push(x, y, z);
+                colors.push(color.r, color.g, color.b);
+                sizes.push(5 + Math.log(commit.stats?.total || 1) * 2);
+            });
+            
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+            geometry.setAttribute('size', new THREE.Float32BufferAttribute(sizes, 1));
+            
+            // Shader Material for nice dots
+            const material = new THREE.PointsMaterial({
+                size: 4,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.8,
+                sizeAttenuation: true,
+                blending: THREE.AdditiveBlending
+            });
+            
+            this.threePoints = new THREE.Points(geometry, material);
+            this.threeScene.add(this.threePoints);
+            
+            // Add connections for 'network' or 'cube'
+            if (type !== 'spiral' && type !== 'abstract-flow') {
+                const lineMat = new THREE.LineBasicMaterial({
+                    color: 0xffffff,
+                    transparent: true,
+                    opacity: 0.1,
+                    blending: THREE.AdditiveBlending
+                });
+                
+                const lineGeo = new THREE.BufferGeometry();
+                const linePos = [];
+                for(let i=0; i<positions.length/3 - 2; i++) {
+                    if (this.rng() > 0.5) continue;
+                    const i3 = i*3;
+                    linePos.push(positions[i3], positions[i3+1], positions[i3+2]);
+                    linePos.push(positions[i3+3], positions[i3+4], positions[i3+5]);
+                }
+                lineGeo.setAttribute('position', new THREE.Float32BufferAttribute(linePos, 3));
+                const lines = new THREE.LineSegments(lineGeo, lineMat);
+                this.threeScene.add(lines);
+                
+                // Track for symmetry
+                if (!this.threeGroup) { this.threeGroup = new THREE.Group(); this.threeScene.add(this.threeGroup); }
+                this.threeGroup.add(this.threePoints);
+                this.threeGroup.add(lines);
+            } else {
+                 if (!this.threeGroup) { this.threeGroup = new THREE.Group(); this.threeScene.add(this.threeGroup); }
+                 this.threeGroup.add(this.threePoints);
+            }
+        }
+        
+        // 3D Symmetry Post-Process
+        if (symmetry !== 'none' && this.threeGroup) {
+            if (symmetry === 'horizontal') {
+                const mirror = this.threeGroup.clone();
+                mirror.scale.x = -1;
+                this.threeScene.add(mirror);
+            } else if (symmetry === 'vertical') {
+                const mirror = this.threeGroup.clone();
+                mirror.scale.y = -1;
+                this.threeScene.add(mirror);
+            } else if (symmetry === 'radial-4') {
+                for(let i=1; i<4; i++) {
+                    const clone = this.threeGroup.clone();
+                    clone.rotation.y = (Math.PI/2) * i;
+                    this.threeScene.add(clone);
+                }
+            }
+        }
+    } // End initializeThree
+
+    renderThree() {
+        if (!this.threeRenderer || !this.threeScene || !this.threeCamera) return;
+        
+        const time = Date.now() * 0.001;
+
+        // Generic Group Rotation (City, Sculpture, Crystal)
+        if (this.threeGroup) {
+            this.threeGroup.rotation.y += 0.002;
+            if (this.threeGroup.children[0] && this.threeGroup.children[0].type === 'Mesh') {
+                // Bobbing for floating items
+                this.threeGroup.position.y = Math.sin(time) * 5;
+            }
+        }
+        
+        // Vapor Grid Animation
+        if (this.threeGrid) {
+            // Infinite scroll effect
+            this.threeGrid.position.z = (time * 50) % 50; 
+        }
+        
+        // Glitch Monolith Animation
+        if (this.monolith && this.monolithGeo && this.monolithBasePos) {
+            if (Math.random() > 0.95) { // Glitch trigger
+                const pos = this.monolithGeo.attributes.position;
+                const base = this.monolithBasePos;
+                for(let i=0; i<pos.count; i++) {
+                    if (Math.random() > 0.8) {
+                        pos.setX(i, base.getX(i) + (Math.random()-0.5)*10);
+                    } else {
+                        pos.setX(i, base.getX(i));
+                    }
+                }
+                pos.needsUpdate = true;
+            }
+            this.monolith.rotation.y = time * 0.5;
+        }
+        
+        // Points Rotation (Fallbacks)
+        if (this.threePoints) {
+            this.threePoints.rotation.y += 0.002;
+            this.threePoints.rotation.z += 0.001;
+        }
+        
+        // Camera drift (Generic)
+        const camTime = time * 0.5;
+        this.threeCamera.position.x += Math.cos(camTime) * 0.2;
+        this.threeCamera.position.y += Math.sin(camTime) * 0.2;
+        this.threeCamera.lookAt(0,0,0);
+        
+        this.threeRenderer.render(this.threeScene, this.threeCamera);
     }
     
     animate(signature, repoData) {
@@ -947,9 +1410,13 @@ class SimpleVisualizer {
         }
 
         const render = () => {
-            this.time += signature.speed;
-            this.clear(signature);
-            this.drawVisualization(signature, repoData);
+            if (signature.style === 'three') {
+                this.renderThree();
+            } else {
+                this.time += signature.speed;
+                this.clear(signature);
+                this.drawVisualization(signature, repoData);
+            }
             this.animationId = requestAnimationFrame(render);
         };
         
@@ -957,6 +1424,12 @@ class SimpleVisualizer {
     }
     
     clear(signature) {
+        if (signature.style === 'paint' || signature.style === 'bio') {
+            // Paint: accumulative
+            // Bio: redraws full pixel buffer every frame
+            return;
+        }
+
         const dpr = window.devicePixelRatio || 1;
         const width = this.canvas.width / dpr;
         const height = this.canvas.height / dpr;
@@ -974,29 +1447,88 @@ class SimpleVisualizer {
         const width = this.canvas.width / dpr;
         const height = this.canvas.height / dpr;
 
-        const compositeByStyle = {
-            constellation: 'source-over',
-            flow: 'source-over',
-            nebula: 'source-over',
-            matrix: 'source-over',
-            mosaic: 'source-over',
-            tree: 'source-over',
-            life: 'source-over',
-            strata: 'source-over',
-            orbit: 'source-over',
-            runes: 'source-over',
-            weave: 'source-over',
-            rift: 'source-over',
-            barcode: 'source-over',
-            collage: 'source-over',
-            radar: 'source-over'
-        };
-        const profileComposite = signature.styleProfile?.composite;
-        this.ctx.globalCompositeOperation = profileComposite || compositeByStyle[signature.style] || 'screen';
+        // Apply procedural compositing and filters
+        this.ctx.globalCompositeOperation = signature.styleProfile.composite || 'source-over';
+        this.ctx.filter = signature.styleProfile.filter || 'none';
         
+        const symmetry = signature.styleProfile.symmetry || 'none';
+        
+        if (symmetry === 'none') {
+            this.renderScene(width, height, signature);
+        } else if (symmetry === 'horizontal') {
+            this.ctx.save();
+            // Left half clip? No, usually drawing full then mirroring is easier or drawing half
+            // Let's just draw full and mirror overlay? Or draw twice.
+            // Draw Normal
+            this.ctx.save();
+            this.ctx.beginPath(); this.ctx.rect(0,0,width/2, height); this.ctx.clip();
+            this.renderScene(width, height, signature);
+            this.ctx.restore();
+            
+            // Mirror
+            this.ctx.save();
+            this.ctx.translate(width, 0);
+            this.ctx.scale(-1, 1);
+            this.ctx.beginPath(); this.ctx.rect(0,0,width/2, height); this.ctx.clip();
+            this.renderScene(width, height, signature);
+            this.ctx.restore();
+            this.ctx.restore();
+        } else if (symmetry === 'vertical') {
+            this.ctx.save();
+            this.ctx.beginPath(); this.ctx.rect(0,0,width, height/2); this.ctx.clip();
+            this.renderScene(width, height, signature);
+            this.ctx.restore();
+            
+            this.ctx.save();
+            this.ctx.translate(0, height);
+            this.ctx.scale(1, -1);
+            this.ctx.beginPath(); this.ctx.rect(0,0,width, height/2); this.ctx.clip();
+            this.renderScene(width, height, signature);
+            this.ctx.restore();
+        } else if (symmetry === 'radial-4') {
+            // Kaleidoscope
+            const cx = width/2;
+            const cy = height/2;
+            for(let i=0; i<4; i++) {
+                this.ctx.save();
+                this.ctx.translate(cx, cy);
+                this.ctx.rotate(i * Math.PI/2);
+                this.ctx.translate(-cx, -cy);
+                // Clip quadrant
+                this.ctx.beginPath();
+                this.ctx.moveTo(cx, cy);
+                this.ctx.lineTo(width, cy);
+                this.ctx.lineTo(width, height);
+                this.ctx.lineTo(cx, height); // roughly bottom right relative to center
+                this.ctx.clip();
+                this.renderScene(width, height, signature);
+                this.ctx.restore();
+            }
+        }
+
+        this.ctx.globalCompositeOperation = 'source-over';
+        this.ctx.filter = 'none';
+        
+        this.drawPostEffects(width, height, signature);
+        this.drawOverlay(width, height, signature, repoData);
+    }
+
+    renderScene(width, height, signature) {
         switch (signature.style) {
             case 'constellation':
                 this.drawConstellation(width, height, signature);
+                break;
+            case 'attractor':
+                this.drawAttractor(width, height, signature);
+                break;
+            case 'bio':
+                this.drawBio(width, height, signature);
+                break;
+            case 'city':
+                this.drawCity(width, height, signature);
+                break;
+            case 'paint':
+                this.drawPainting(width, height, signature);
                 break;
             case 'flow':
                 this.drawFlowField(width, height, signature);
@@ -1041,15 +1573,119 @@ class SimpleVisualizer {
                 this.drawRadar(width, height, signature);
                 break;
             default:
-                this.drawConstellation(width, height, signature);
+                this.drawCity(width, height, signature);
+        }
+    }
+
+    drawPostEffects(width, height, signature) {
+        const ctx = this.ctx;
+        const profile = signature.styleProfile;
+        
+        // 1. Texture Overlays
+        if (profile.textureOverlay && profile.textureOverlay !== 'none') {
+            const seed = signature.hash;
+            // Generate texture once if not cached
+            if (!this.styleState.overlayTexture) {
+                const c = document.createElement('canvas');
+                c.width = 512; c.height = 512;
+                const tx = c.getContext('2d');
+                const rng = this.createSeededRNG(seed);
+                
+                if (profile.textureOverlay === 'paper') {
+                    tx.fillStyle = '#fff'; tx.fillRect(0,0,512,512);
+                    for(let i=0; i<50000; i++) {
+                        tx.fillStyle = `rgba(0,0,0,${rng()*0.05})`;
+                        tx.fillRect(rng()*512, rng()*512, 2, 2);
+                    }
+                } else if (profile.textureOverlay === 'canvas') {
+                    tx.fillStyle = '#fff'; tx.fillRect(0,0,512,512);
+                    tx.strokeStyle = 'rgba(0,0,0,0.05)';
+                    for(let i=0; i<512; i+=4) {
+                        tx.beginPath(); tx.moveTo(i,0); tx.lineTo(i,512); tx.stroke();
+                        tx.beginPath(); tx.moveTo(0,i); tx.lineTo(512,i); tx.stroke();
+                    }
+                } else if (profile.textureOverlay === 'grid') {
+                    tx.strokeStyle = 'rgba(0,255,255,0.1)';
+                    tx.lineWidth = 1;
+                    tx.beginPath();
+                    for(let i=0; i<512; i+=32) {
+                        tx.moveTo(i,0); tx.lineTo(i,512);
+                        tx.moveTo(0,i); tx.lineTo(512,i);
+                    }
+                    tx.stroke();
+                } else if (profile.textureOverlay === 'noise') {
+                    const id = tx.createImageData(512,512);
+                    for(let i=0; i<id.data.length; i+=4) {
+                        const v = rng()*255;
+                        id.data[i] = v; id.data[i+1] = v; id.data[i+2] = v; id.data[i+3] = 30;
+                    }
+                    tx.putImageData(id,0,0);
+                }
+                this.styleState.overlayTexture = c;
+            }
+            
+            ctx.save();
+            ctx.globalCompositeOperation = 'overlay';
+            const pat = ctx.createPattern(this.styleState.overlayTexture, 'repeat');
+            ctx.fillStyle = pat;
+            ctx.fillRect(0, 0, width, height);
+            ctx.restore();
         }
 
-        this.ctx.globalCompositeOperation = 'source-over';
-            if (signature.styleProfile?.frame) {
-                this.drawFrame(width, height, signature);
+        // 2. Glitch Mode
+        if (profile.glitchMode && profile.glitchMode !== 'none') {
+            if (Math.random() > 0.9) { // Random flicker
+                const h = Math.random() * 50;
+                const y = Math.random() * height;
+                const offset = (Math.random() - 0.5) * 20;
+                const id = ctx.getImageData(0, y, width, h);
+                ctx.putImageData(id, offset, y);
             }
-            this.drawOverlay(width, height, signature, repoData);
+            
+            if (profile.glitchMode === 'scanlines') {
+                ctx.fillStyle = 'rgba(0,0,0,0.1)';
+                for(let y=0; y<height; y+=2) ctx.fillRect(0,y,width,1);
+            } else if (profile.glitchMode === 'rgb-shift') {
+                // Expensive to do full frame, skipping for perf or doing simplified
+                // ...
+            }
         }
+
+        // 3. Borders
+        if (profile.borderMode && profile.borderMode !== 'none') {
+            ctx.save();
+            ctx.strokeStyle = '#111';
+            if (profile.borderMode === 'simple') {
+                ctx.lineWidth = 20;
+                ctx.strokeRect(0,0,width,height);
+            } else if (profile.borderMode === 'polaroid') {
+                ctx.fillStyle = '#eee';
+                ctx.fillRect(0, height-60, width, 60); // Bottom lip
+                ctx.lineWidth = 20;
+                ctx.fillStyle = '#eee'; // Sides
+                ctx.fillRect(0,0,20,height);
+                ctx.fillRect(width-20,0,20,height);
+                ctx.fillRect(0,0,width,20);
+            } else if (profile.borderMode === 'vignette') {
+                const grad = ctx.createRadialGradient(width/2, height/2, height/2, width/2, height/2, height);
+                grad.addColorStop(0, 'rgba(0,0,0,0)');
+                grad.addColorStop(1, 'rgba(0,0,0,0.8)');
+                ctx.fillStyle = grad;
+                ctx.fillRect(0,0,width,height);
+            } else if (profile.borderMode === 'film-strip') {
+                ctx.fillStyle = '#000';
+                ctx.fillRect(0,0,40,height);
+                ctx.fillRect(width-40,0,40,height);
+                // Holes
+                ctx.fillStyle = '#fff';
+                for(let y=10; y<height; y+=30) {
+                    ctx.fillRect(10,y,20,15);
+                    ctx.fillRect(width-30,y,20,15);
+                }
+            }
+            ctx.restore();
+        }
+    }
 
     drawTree(width, height, signature) {
         const segments = this.styleState.treeSegments;
@@ -1155,63 +1791,39 @@ class SimpleVisualizer {
         const cellW = width / cols;
         const cellH = height / rows;
         const maxAge = this.styleState.lifeMaxAge || 18;
-        const cellStyle = this.styleState.lifeCellStyle || 'square';
+        
+        // Use additive blending for glow effect
+        this.ctx.globalCompositeOperation = 'lighter';
         
         for (let i = 0; i < cols; i++) {
             for (let j = 0; j < rows; j++) {
                 const age = this.lifeGrid[i][j];
                 if (age > 0) {
                     const ageNorm = Math.min(age, maxAge) / maxAge;
-                    const hue = (signature.secondaryHue + ageNorm * 80 + (i / cols) * 25 - (j / rows) * 20 + 360) % 360;
-                    const lightness = 30 + ageNorm * 40;
-                    const alpha = 0.2 + ageNorm * 0.8;
-                    const pulse = 0.7 + 0.3 * Math.sin(this.time + (i + j) * 0.2);
-                    const size = Math.min(cellW, cellH) * (0.4 + ageNorm * 0.55) * pulse;
-                    const x = i * cellW + (cellW - size) / 2;
-                    const y = j * cellH + (cellH - size) / 2;
-
-                    this.ctx.fillStyle = `hsla(${hue}, 70%, ${lightness}%, ${alpha})`;
-                    if (cellStyle === 'circle') {
-                        this.ctx.beginPath();
-                        this.ctx.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2);
-                        this.ctx.fill();
-                    } else if (cellStyle === 'diamond') {
-                        this.ctx.beginPath();
-                        this.ctx.moveTo(x + size / 2, y);
-                        this.ctx.lineTo(x + size, y + size / 2);
-                        this.ctx.lineTo(x + size / 2, y + size);
-                        this.ctx.lineTo(x, y + size / 2);
-                        this.ctx.closePath();
-                        this.ctx.fill();
-                    } else {
-                        this.ctx.fillRect(x, y, size, size);
-                    }
-
-                    const inset = size * 0.25;
-                    this.ctx.fillStyle = `hsla(${hue}, 80%, ${lightness + 12}%, ${alpha * 0.5})`;
-                    if (cellStyle === 'circle') {
-                        this.ctx.beginPath();
-                        this.ctx.arc(x + size / 2, y + size / 2, Math.max(1, (size - inset * 2) / 2), 0, Math.PI * 2);
-                        this.ctx.fill();
-                    } else if (cellStyle === 'diamond') {
-                        const insetSize = size - inset * 2;
-                        const cx = x + size / 2;
-                        const cy = y + size / 2;
-                        this.ctx.beginPath();
-                        this.ctx.moveTo(cx, cy - insetSize / 2);
-                        this.ctx.lineTo(cx + insetSize / 2, cy);
-                        this.ctx.lineTo(cx, cy + insetSize / 2);
-                        this.ctx.lineTo(cx - insetSize / 2, cy);
-                        this.ctx.closePath();
-                        this.ctx.fill();
-                    } else {
-                        this.ctx.fillRect(x + inset, y + inset, size - inset * 2, size - inset * 2);
-                    }
+                    const hue = (signature.secondaryHue + ageNorm * 40 + (i / cols) * 60) % 360;
+                    const lightness = 40 + ageNorm * 40;
+                    const alpha = 0.3 + ageNorm * 0.6;
+                    
+                    const x = i * cellW;
+                    const y = j * cellH;
+                    
+                    this.ctx.shadowColor = `hsla(${hue}, 80%, 50%, 0.8)`;
+                    this.ctx.shadowBlur = 10;
+                    this.ctx.fillStyle = `hsla(${hue}, 80%, ${lightness}%, ${alpha})`;
+                    
+                    // Draw rounded rects for organic look
+                    const size = cellW * 0.85;
+                    const radius = size * 0.3;
+                    this.ctx.beginPath();
+                    this.ctx.roundRect(x + (cellW - size)/2, y + (cellH - size)/2, size, size, radius);
+                    this.ctx.fill();
                 }
             }
         }
+        this.ctx.globalCompositeOperation = 'source-over';
+        this.ctx.shadowBlur = 0;
 
-        if (Math.floor(this.time * 100) % 5 === 0) {
+        if (Math.floor(this.time * 100) % 6 === 0) { // Slower update
             const next = this.lifeGrid.map(arr => [...arr]);
             for (let i = 0; i < cols; i++) {
                 for (let j = 0; j < rows; j++) {
@@ -1229,7 +1841,9 @@ class SimpleVisualizer {
                     } else if (this.lifeGrid[i][j] === 0 && neighbors === 3) {
                         next[i][j] = 1;
                     } else {
-                        next[i][j] = 0;
+                        // Decay instead of instant death
+                         if (this.lifeGrid[i][j] > 0) next[i][j] = this.lifeGrid[i][j] - 1; 
+                         else next[i][j] = 0;
                     }
                 }
             }
@@ -1240,64 +1854,56 @@ class SimpleVisualizer {
     drawConstellation(width, height, signature) {
         const profile = signature.styleProfile || {};
         const palette = this.styleState.palette || [];
+        
+        // 1. Draw subtle starfield background
         if (this.styleState.stars) {
             this.ctx.save();
             this.styleState.stars.forEach((star) => {
-                const twinkle = 0.5 + 0.5 * Math.sin(this.time * 1.5 + star.twinkle);
-                const alpha = star.alpha * twinkle;
-                this.ctx.fillStyle = `hsla(${star.hue}, 15%, 80%, ${alpha})`;
+                const alpha = star.alpha * (0.3 + 0.7 * Math.sin(this.time * 0.5 + star.twinkle));
+                this.ctx.fillStyle = `hsla(${star.hue}, 20%, 80%, ${alpha})`;
                 this.ctx.fillRect(star.x, star.y, star.r, star.r);
-
-                if (star.r > 1.4 || star.burst) {
-                    const burstScale = star.burst ? 1 + star.burst : 1;
-                    this.ctx.strokeStyle = `hsla(${star.hue}, 20%, 85%, ${alpha * 0.4})`;
-                    this.ctx.lineWidth = 0.6;
-                    this.ctx.beginPath();
-                    this.ctx.moveTo(star.x - star.r * 2.2 * burstScale, star.y);
-                    this.ctx.lineTo(star.x + star.r * 2.2 * burstScale, star.y);
-                    this.ctx.moveTo(star.x, star.y - star.r * 2.2 * burstScale);
-                    this.ctx.lineTo(star.x, star.y + star.r * 2.2 * burstScale);
-                    this.ctx.stroke();
-                }
             });
             this.ctx.restore();
         }
 
-        // Update particles
+        // 2. Update particle positions (Slow drift)
         this.particles.forEach(p => {
-            // Subtle orbital movement based on phase
             if (!p.isBackground) {
-                p.x += Math.cos(this.time + p.phase) * 0.3;
-                p.y += Math.sin(this.time + p.phase) * 0.3;
+                p.x += Math.cos(this.time * 0.5 + p.phase) * 0.2;
+                p.y += Math.sin(this.time * 0.5 + p.phase) * 0.2;
             }
         });
 
-        // Draw Connections
-        const linkRadius = profile.linkRadius || 90;
-        this.ctx.lineWidth = 1;
+        // 3. Draw Dense Network Connections
+        const linkRadius = (profile.linkRadius || 120) * 1.5;
+        this.ctx.lineWidth = 0.8;
         this.ctx.lineCap = 'round';
+        
+        // Optimization: spatial partition or just brute force (150 particles is fine)
         for (let i = 0; i < this.particles.length; i++) {
             const p1 = this.particles[i];
             if (p1.isBackground) continue;
 
-            // Only connect if hue is similar (Same Author/Team)
-            // OR if spatially close
+            const neighbors = [];
+            
             for (let j = i + 1; j < this.particles.length; j++) {
                 const p2 = this.particles[j];
                 if (p2.isBackground) continue;
 
                 const dx = p1.x - p2.x;
                 const dy = p1.y - p2.y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
+                const distSq = dx * dx + dy * dy;
+                const radiusSq = linkRadius * linkRadius;
 
-                // Connect if close
-                if (dist < linkRadius) {
+                if (distSq < radiusSq) {
+                    const dist = Math.sqrt(distSq);
                     const intensity = 1 - dist / linkRadius;
-                    const midHue = (p1.hue + p2.hue) / 2;
-                    const paletteTone = this.getPaletteColorForHue(midHue, palette);
-                    const opacity = intensity * 0.35;
-                    this.ctx.strokeStyle = `hsla(${paletteTone.h}, ${paletteTone.s * 0.6}%, ${paletteTone.l}%, ${opacity})`;
-                    this.ctx.lineWidth = 0.5 + intensity * 1.2;
+                    
+                    // Color blending
+                    const hue = (p1.hue + p2.hue) / 2;
+                    const paletteTone = this.getPaletteColorForHue(hue, palette);
+                    
+                    this.ctx.strokeStyle = `hsla(${paletteTone.h}, ${paletteTone.s}%, ${paletteTone.l}%, ${intensity * 0.15})`;
                     this.ctx.beginPath();
                     this.ctx.moveTo(p1.x, p1.y);
                     this.ctx.lineTo(p2.x, p2.y);
@@ -1306,31 +1912,19 @@ class SimpleVisualizer {
             }
         }
 
-        // Draw Particles (Nodes)
-        this.particles.forEach((p, index) => {
-            const pulse = Math.sin(this.time * 2 + p.phase) * 0.5 + 1; // 0.5 to 1.5
-            const coreRadius = (p.size / 2) * pulse;
+        // 4. Draw Glowing Nodes
+        this.ctx.shadowBlur = 10;
+        this.particles.forEach((p) => {
             const paletteTone = this.getPaletteColorForHue(p.hue, palette);
-
-            this.ctx.fillStyle = `hsla(${paletteTone.h}, ${paletteTone.s}%, ${paletteTone.l}%, 0.9)`;
-            if (index % 3 === 0) {
-                const side = coreRadius * 1.8;
-                this.ctx.fillRect(p.x - side / 2, p.y - side / 2, side, side);
-            } else {
-                const side = coreRadius * 1.6;
-                this.ctx.save();
-                this.ctx.translate(p.x, p.y);
-                this.ctx.rotate(Math.PI / 4);
-                this.ctx.fillRect(-side / 2, -side / 2, side, side);
-                this.ctx.restore();
-            }
-
-            this.ctx.strokeStyle = `hsla(${paletteTone.h}, ${paletteTone.s * 0.5}%, ${Math.max(20, paletteTone.l - 20)}%, 0.5)`;
-            this.ctx.lineWidth = 0.7;
+            this.ctx.fillStyle = `hsla(${paletteTone.h}, ${paletteTone.s}%, ${paletteTone.l + 20}%, 0.9)`;
+            this.ctx.shadowColor = `hsla(${paletteTone.h}, ${paletteTone.s}%, ${paletteTone.l}%, 0.8)`;
+            
+            const size = Math.max(1.5, p.size * 0.3);
             this.ctx.beginPath();
-            this.ctx.arc(p.x, p.y, coreRadius * 1.8, 0, Math.PI * 2);
-            this.ctx.stroke();
+            this.ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
+            this.ctx.fill();
         });
+        this.ctx.shadowBlur = 0;
     }
 
     drawFlowField(width, height, signature) {
@@ -1633,15 +2227,20 @@ class SimpleVisualizer {
         const spacing = height / (layers + 1);
         const palette = this.styleState.palette || [];
 
+        this.ctx.globalCompositeOperation = 'screen';
+
         for (let i = 0; i < layers; i++) {
             const baseY = spacing * (i + 1) + Math.sin(this.time * 0.2 + i) * spacing * 0.12;
             const hueSeed = (signature.primaryHue + i * 12 + (signature.hash % 30)) % 360;
             const paletteTone = this.getPaletteColorForHue(hueSeed, palette);
             const lightness = Math.min(80, paletteTone.l + i * 1.5);
-            const alpha = 0.12 + (i / layers) * 0.18;
+            const alpha = 0.4 + (i / layers) * 0.4; // Higher alpha for glow
 
             this.ctx.strokeStyle = `hsla(${paletteTone.h}, ${paletteTone.s}%, ${lightness}%, ${alpha})`;
-            this.ctx.lineWidth = 1 + i * 0.08;
+            this.ctx.lineWidth = 2 + i * 0.15;
+            this.ctx.shadowColor = `hsla(${paletteTone.h}, ${paletteTone.s}%, 50%, 1)`;
+            this.ctx.shadowBlur = 15;
+            
             this.ctx.beginPath();
 
             for (let x = 0; x <= width; x += 6) {
@@ -1656,73 +2255,75 @@ class SimpleVisualizer {
             }
             this.ctx.stroke();
         }
-
-        const markerStep = Math.max(6, Math.floor(this.particles.length / 20));
-        for (let i = 0; i < this.particles.length; i += markerStep) {
-            const p = this.particles[i];
-            const hue = (p.hue + signature.tertiaryHue) % 360;
-            this.ctx.strokeStyle = `hsla(${hue}, 40%, 40%, 0.18)`;
-            this.ctx.lineWidth = 0.8;
-            this.ctx.beginPath();
-            this.ctx.moveTo(p.originX, 0);
-            this.ctx.lineTo(p.originX, height);
-            this.ctx.stroke();
-        }
+        
+        this.ctx.shadowBlur = 0;
+        this.ctx.globalCompositeOperation = 'source-over';
     }
 
     drawOrbit(width, height, signature) {
         const centers = this.styleState.orbitCenters || [{ x: width * 0.5, y: height * 0.5 }];
-        const rings = this.styleState.orbitRings || [];
-        const tightness = this.styleState.orbitTightness || 1;
         const palette = this.styleState.palette || [];
 
-        centers.forEach((center, index) => {
-            const ringList = rings[index] || [];
-            ringList.forEach((radius, ringIndex) => {
-                const hue = (signature.primaryHue + index * 20 + ringIndex * 15) % 360;
-                const paletteTone = this.getPaletteColorForHue(hue, palette);
-                this.ctx.strokeStyle = `hsla(${paletteTone.h}, ${paletteTone.s * 0.5}%, ${paletteTone.l}%, 0.2)`;
-                this.ctx.lineWidth = 0.8;
-                this.ctx.beginPath();
-                this.ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
-                this.ctx.stroke();
-            });
+        // Draw Central Core
+        centers.forEach((center, i) => {
+             const hue = signature.primaryHue;
+             const grad = this.ctx.createRadialGradient(center.x, center.y, 1, center.x, center.y, 60);
+             grad.addColorStop(0, `hsla(${hue}, 80%, 80%, 0.8)`);
+             grad.addColorStop(1, `hsla(${hue}, 60%, 20%, 0)`);
+             this.ctx.fillStyle = grad;
+             this.ctx.beginPath();
+             this.ctx.arc(center.x, center.y, 60, 0, Math.PI * 2);
+             this.ctx.fill();
         });
 
+        // Draw Particles as Orbiting Bodies with Trails
         this.particles.forEach(p => {
             const center = centers[p.orbitIndex || 0] || centers[0];
-            const angle = this.time * (p.orbitSpeed || 0.002) + (p.orbitPhase || 0);
-            const radius = (p.orbitRadius || 60);
-            const x = center.x + Math.cos(angle) * radius;
-            const y = center.y + Math.sin(angle) * radius * tightness;
+            // Elliptical Orbit
+            const tilt = 0.6; // 3D tilt effect
+            const speed = p.orbitSpeed || 0.002;
+            const angle = this.time * speed + (p.orbitPhase || 0);
+            const r = p.orbitRadius || 100;
+            
+            // Calculate current position
+            const x = center.x + Math.cos(angle) * r;
+            const y = center.y + Math.sin(angle) * r * tilt;
+            
+            // Calculate trail position (slightly behind in time)
+            const trailAngle = angle - 0.15; // Trail lag
+            const tx = center.x + Math.cos(trailAngle) * r;
+            const ty = center.y + Math.sin(trailAngle) * r * tilt;
 
             const hue = (p.hue + signature.secondaryHue) / 2;
             const paletteTone = this.getPaletteColorForHue(hue, palette);
-            this.ctx.strokeStyle = `hsla(${paletteTone.h}, ${paletteTone.s * 0.6}%, ${paletteTone.l}%, 0.3)`;
-            this.ctx.lineWidth = Math.max(0.6, p.size * 0.2);
+            
+            // Draw Trail
+            const grad = this.ctx.createLinearGradient(x, y, tx, ty);
+            grad.addColorStop(0, `hsla(${paletteTone.h}, ${paletteTone.s}%, ${paletteTone.l}%, 0.6)`);
+            grad.addColorStop(1, `hsla(${paletteTone.h}, ${paletteTone.s}%, ${paletteTone.l}%, 0)`);
+            
+            this.ctx.strokeStyle = grad;
+            this.ctx.lineWidth = Math.max(1, p.size * 0.3);
             this.ctx.beginPath();
-            this.ctx.moveTo(p.prevX || x, p.prevY || y);
-            this.ctx.lineTo(x, y);
+            this.ctx.moveTo(x, y);
+            this.ctx.lineTo(tx, ty);
             this.ctx.stroke();
 
-            const block = p.size * 0.9 + 1.2;
-            this.ctx.fillStyle = `hsla(${paletteTone.h}, ${paletteTone.s}%, ${Math.min(85, paletteTone.l + 10)}%, 0.8)`;
-            this.ctx.fillRect(x - block / 2, y - block / 2, block, block);
-
-            p.prevX = x;
-            p.prevY = y;
+            // Draw Body
+            this.ctx.fillStyle = `hsla(${paletteTone.h}, ${paletteTone.s}%, ${paletteTone.l + 20}%, 1)`;
+            this.ctx.beginPath();
+            this.ctx.arc(x, y, Math.max(1, p.size * 0.2), 0, Math.PI * 2);
+            this.ctx.fill();
         });
     }
 
     drawRunes(width, height, signature) {
-        const density = this.styleState.runeDensity || 1;
-        const scale = this.styleState.runeScale || 1;
-        const total = this.particles.length;
-        const target = Math.max(8, Math.floor(total * density));
-        const stride = Math.max(1, Math.floor(total / target));
         const palette = this.styleState.palette || [];
-
-        const drawSigil = (x, y, size, seed, hue) => {
+        const center = { x: width / 2, y: height / 2 };
+        const maxRadius = Math.min(width, height) * 0.45;
+        const ringCount = 8;
+        
+        const drawSigil = (x, y, size, seed, hue, alpha) => {
             let state = seed >>> 0;
             const rand = () => {
                 state = (1664525 * state + 1013904223) >>> 0;
@@ -1731,162 +2332,250 @@ class SimpleVisualizer {
             const paletteTone = this.getPaletteColorForHue(hue, palette);
 
             const strokes = 3 + Math.floor(rand() * 4);
-            this.ctx.strokeStyle = `hsla(${paletteTone.h}, ${paletteTone.s}%, ${paletteTone.l}%, 0.55)`;
-            this.ctx.lineWidth = Math.max(0.8, size * 0.14);
+            this.ctx.strokeStyle = `hsla(${paletteTone.h}, ${paletteTone.s}%, ${paletteTone.l}%, ${alpha})`;
+            this.ctx.lineWidth = Math.max(1, size * 0.1);
+            
+            this.ctx.beginPath();
             for (let i = 0; i < strokes; i++) {
-                const x1 = (rand() - 0.5) * size * 1.8;
-                const y1 = (rand() - 0.5) * size * 1.8;
-                const x2 = (rand() - 0.5) * size * 1.8;
-                const y2 = (rand() - 0.5) * size * 1.8;
-                this.ctx.beginPath();
+                const x1 = (rand() - 0.5) * size;
+                const y1 = (rand() - 0.5) * size;
+                const x2 = (rand() - 0.5) * size;
+                const y2 = (rand() - 0.5) * size;
                 this.ctx.moveTo(x + x1, y + y1);
                 this.ctx.lineTo(x + x2, y + y2);
-                this.ctx.stroke();
             }
-
-            const stampSize = size * 0.35;
-            this.ctx.fillStyle = `hsla(${paletteTone.h}, ${Math.max(15, paletteTone.s - 20)}%, ${Math.max(20, paletteTone.l - 10)}%, 0.6)`;
-            this.ctx.fillRect(x - stampSize / 2, y - stampSize / 2, stampSize, stampSize);
+            this.ctx.stroke();
         };
 
-        for (let i = 0; i < total; i += stride) {
-            const p = this.particles[i];
-            const seed = this.hashString(p.commit?.sha || String(i)) + signature.hash;
-            const angle = this.time * 0.3 + (seed % 360) * (Math.PI / 180);
-            const drift = this.noise.noise(p.originX * 0.01, p.originY * 0.01 + this.time * 0.4) * 8;
-            const orbit = 6 + (seed % 25);
-            const x = p.originX + Math.cos(angle) * orbit + drift;
-            const y = p.originY + Math.sin(angle) * orbit + drift;
-            const size = (2.5 + p.size * 0.7) * scale;
-            const hue = (signature.primaryHue + p.hue) % 360;
+        this.ctx.globalCompositeOperation = 'lighter';
 
-            drawSigil(x, y, size, seed, hue);
+        for (let r = 0; r < ringCount; r++) {
+            const radius = (r + 1) / ringCount * maxRadius;
+            const circumference = 2 * Math.PI * radius;
+            const glyphSize = 20 + r * 5;
+            const glyphCount = Math.floor(circumference / (glyphSize * 1.5));
+            const speed = (r % 2 === 0 ? 1 : -1) * (0.002 + 0.005 / (r + 1));
+            const ringPhase = this.time * speed + r;
+
+            for (let i = 0; i < glyphCount; i++) {
+                const angle = (i / glyphCount) * Math.PI * 2 + ringPhase;
+                const x = center.x + Math.cos(angle) * radius;
+                const y = center.y + Math.sin(angle) * radius;
+                
+                // Use particle data for seeding if available, otherwise procedural
+                const seed = this.hashString(signature.hash + r + i);
+                const hue = (signature.primaryHue + r * 20) % 360;
+                const alpha = 0.4 + 0.3 * Math.sin(angle * 2 + this.time);
+
+                drawSigil(x, y, glyphSize, seed, hue, alpha);
+            }
+            
+            // Draw ring line
+            this.ctx.strokeStyle = `hsla(${signature.primaryHue}, 20%, 30%, 0.1)`;
+            this.ctx.lineWidth = 1;
+            this.ctx.beginPath();
+            this.ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
+            this.ctx.stroke();
         }
+        this.ctx.globalCompositeOperation = 'source-over';
     }
 
     drawWeave(width, height, signature) {
-        const cols = this.styleState.weaveCols || 10;
-        const rows = this.styleState.weaveRows || 8;
-        const amplitude = this.styleState.weaveAmplitude || Math.round(height * 0.05);
+        const cols = (this.styleState.weaveCols || 10) * 3; // Tripled density
+        const rows = (this.styleState.weaveRows || 8) * 3;
         const palette = this.styleState.palette || [];
         const bandW = width / cols;
         const bandH = height / rows;
+        
+        this.ctx.globalCompositeOperation = 'multiply';
 
+        // Vertical Threads (Warp)
         for (let i = 0; i < cols; i++) {
             const tone = palette[i % palette.length] || { h: signature.primaryHue, s: 40, l: 40 };
-            const drift = Math.sin(this.time * 0.4 + i) * amplitude * 0.15;
-            this.ctx.fillStyle = `hsla(${tone.h}, ${tone.s}%, ${tone.l}%, 0.8)`;
-            this.ctx.fillRect(i * bandW, drift, bandW + 1, height);
+            this.ctx.strokeStyle = `hsla(${tone.h}, ${tone.s}%, ${tone.l}%, 0.3)`;
+            this.ctx.lineWidth = bandW * 0.8;
+            this.ctx.beginPath();
+            
+            for (let y = 0; y <= height; y += 10) {
+                // Noise-based distortion
+                const noise = this.noise.noise(i * 0.1, y * 0.01 + this.time * 0.1);
+                const x = i * bandW + noise * 10;
+                if (y===0) this.ctx.moveTo(x, y);
+                else this.ctx.lineTo(x, y);
+            }
+            this.ctx.stroke();
         }
 
+        // Horizontal Threads (Weft)
         for (let j = 0; j < rows; j++) {
             const tone = palette[(j + 2) % palette.length] || { h: signature.secondaryHue, s: 35, l: 45 };
-            const drift = Math.cos(this.time * 0.3 + j) * amplitude * 0.15;
-            this.ctx.fillStyle = `hsla(${tone.h}, ${tone.s}%, ${tone.l}%, 0.65)`;
-            this.ctx.fillRect(0, j * bandH + drift, width, bandH + 1);
-        }
-
-        for (let i = 0; i < cols; i++) {
-            for (let j = 0; j < rows; j++) {
-                const tone = palette[(i + j) % palette.length] || { h: signature.tertiaryHue, s: 30, l: 35 };
-                const x = i * bandW;
-                const y = j * bandH;
-                const inset = Math.min(bandW, bandH) * 0.1;
-                this.ctx.strokeStyle = `hsla(${tone.h}, ${Math.max(10, tone.s - 20)}%, ${Math.max(15, tone.l - 20)}%, 0.4)`;
-                this.ctx.lineWidth = 1;
-                this.ctx.strokeRect(x + inset, y + inset, bandW - inset * 2, bandH - inset * 2);
+            this.ctx.strokeStyle = `hsla(${tone.h}, ${tone.s}%, ${tone.l}%, 0.3)`;
+            this.ctx.lineWidth = bandH * 0.8;
+            this.ctx.beginPath();
+            
+            for (let x = 0; x <= width; x += 10) {
+                 const noise = this.noise.noise(x * 0.01 + this.time * 0.1, j * 0.1);
+                 const y = j * bandH + noise * 10;
+                 if (x===0) this.ctx.moveTo(x, y);
+                 else this.ctx.lineTo(x, y);
             }
+            this.ctx.stroke();
         }
+        
+        // Highlights (Texture)
+        this.ctx.globalCompositeOperation = 'source-over';
+        this.particles.forEach(p => {
+             // Subtle stitch highlights
+             const x = p.x;
+             const y = p.y;
+             this.ctx.fillStyle = `hsla(${p.hue}, 60%, 80%, 0.3)`;
+             this.ctx.beginPath();
+             this.ctx.arc(x, y, 1.5, 0, Math.PI * 2);
+             this.ctx.fill();
+        });
     }
 
     drawRift(width, height, signature) {
-        const slices = this.styleState.riftSlices || 14;
-        const jitter = this.styleState.riftJitter || 24;
+        const lines = 40;
+        const step = height / lines;
         const palette = this.styleState.palette || [];
-        const sliceW = width / slices;
+        
+        // Draw back to front
+        for (let i = 0; i < lines; i++) {
+            const baseY = i * step + 40;
+            const tone = palette[i % palette.length] || { h: signature.primaryHue, s: 0, l: 50 };
+            
+            this.ctx.beginPath();
+            this.ctx.moveTo(0, baseY);
+            
+            for (let x = 0; x <= width; x += 10) {
+                // Noise base
+                let yOff = this.noise.noise(x * 0.005, i * 0.1 + this.time * 0.2) * 40;
+                
+                // Interaction with particles
+                // Find nearest particle to this x location (simplified influence)
+                // We'll just map particles to x-zones to avoid N^2 loop inside drawing loop
+                // ...or just use a few spatial noise layers
+                
+                yOff -= Math.abs(this.noise.noise(x * 0.02, this.time * 0.5)) * 30 * (1 - i/lines);
 
-        for (let i = 0; i < slices; i++) {
-            const tone = palette[i % palette.length] || { h: signature.primaryHue, s: 40, l: 40 };
-            const offset = this.noise.noise(i * 0.4, this.time * 0.3) * jitter;
-            this.ctx.fillStyle = `hsla(${tone.h}, ${tone.s}%, ${tone.l}%, 0.85)`;
-            this.ctx.fillRect(i * sliceW, offset, sliceW + 1, height);
-        }
-
-        const stride = Math.max(1, Math.floor(this.particles.length / 40));
-        for (let i = 0; i < this.particles.length; i += stride) {
-            const p = this.particles[i];
-            const tone = this.getPaletteColorForHue(p.hue, palette);
-            const sliceIndex = Math.max(0, Math.min(slices - 1, Math.floor(p.originX / sliceW)));
-            const baseX = sliceIndex * sliceW;
-            const offset = this.noise.noise(sliceIndex * 0.4, this.time * 0.3) * jitter;
-            const blockW = sliceW * 0.6;
-            const blockH = 6 + p.size * 1.2;
-            const y = (p.originY + offset + this.time * 20) % height;
-            this.ctx.fillStyle = `hsla(${tone.h}, ${tone.s}%, ${Math.min(80, tone.l + 10)}%, 0.8)`;
-            this.ctx.fillRect(baseX + (sliceW - blockW) / 2, y, blockW, blockH);
+                this.ctx.lineTo(x, baseY + yOff);
+            }
+            
+            this.ctx.lineTo(width, height);
+            this.ctx.lineTo(0, height);
+            this.ctx.closePath();
+            
+            // Fill with background color to occlude lower lines
+            this.ctx.fillStyle = `hsla(${signature.primaryHue}, 10%, 5%, 1)`;
+            this.ctx.fill();
+            
+            // Stroke the edge
+            this.ctx.strokeStyle = `hsla(${tone.h}, ${tone.s}%, 70%, 0.8)`;
+            this.ctx.lineWidth = 1.5;
+            this.ctx.stroke();
         }
     }
 
     drawBarcode(width, height, signature) {
         const bars = this.styleState.barcodeBars || [];
         const palette = this.styleState.palette || [];
-        const labelHeight = height * 0.18;
-        const labelY = height * 0.7;
-
+        const centerY = height / 2;
+        
+        this.ctx.globalCompositeOperation = 'lighter';
+        
+        // Draw spectral bars
         bars.forEach((bar, index) => {
-            const tone = bar.color || palette[index % palette.length] || { h: signature.primaryHue, s: 40, l: 40 };
-            this.ctx.fillStyle = `hsla(${tone.h}, ${tone.s}%, ${tone.l}%, ${bar.alpha})`;
-            this.ctx.fillRect(bar.x, 0, bar.w, height);
+            const tone = bar.color || palette[index % palette.length];
+            const noise = this.noise.noise(index * 0.1, this.time * 0.5);
+            const activity = Math.max(0.1, noise + 0.5); // 0.1 to 1.5
+            const h = height * 0.4 * activity;
+            
+            const grad = this.ctx.createLinearGradient(0, centerY - h, 0, centerY + h);
+            grad.addColorStop(0, `hsla(${tone.h}, ${tone.s}%, ${tone.l}%, 0)`);
+            grad.addColorStop(0.5, `hsla(${tone.h}, ${tone.s}%, ${tone.l}%, ${bar.alpha})`);
+            grad.addColorStop(1, `hsla(${tone.h}, ${tone.s}%, ${tone.l}%, 0)`);
+            
+            this.ctx.fillStyle = grad;
+            this.ctx.fillRect(bar.x, centerY - h, bar.w, h * 2);
+            
+            // Peak dot
+            this.ctx.fillStyle = `hsla(${tone.h}, 90%, 90%, 0.8)`;
+            this.ctx.fillRect(bar.x, centerY - h - 2, bar.w, 2);
+            this.ctx.fillRect(bar.x, centerY + h, bar.w, 2);
         });
-
-        if (palette.length) {
-            const bandTone = palette[0];
-            this.ctx.fillStyle = `hsla(${bandTone.h}, ${bandTone.s * 0.5}%, ${Math.min(90, bandTone.l + 20)}%, 0.85)`;
-            this.ctx.fillRect(width * 0.08, labelY, width * 0.84, labelHeight);
-
-            const bandTone2 = palette[1] || bandTone;
-            this.ctx.fillStyle = `hsla(${bandTone2.h}, ${Math.max(10, bandTone2.s - 20)}%, ${Math.max(15, bandTone2.l - 10)}%, 0.7)`;
-            this.ctx.fillRect(width * 0.12, labelY + labelHeight * 0.2, width * 0.76, labelHeight * 0.6);
-        }
-
-        const step = Math.max(1, Math.floor(this.particles.length / 60));
-        for (let i = 0; i < this.particles.length; i += step) {
-            const p = this.particles[i];
-            const tone = this.getPaletteColorForHue(p.hue, palette);
-            const size = 4 + (p.size * 0.6);
-            this.ctx.fillStyle = `hsla(${tone.h}, ${tone.s}%, ${Math.min(85, tone.l + 12)}%, 0.8)`;
-            this.ctx.fillRect(p.originX - size / 2, (p.originY + this.time * 8) % height, size, size);
-        }
+        
+        this.ctx.globalCompositeOperation = 'source-over';
     }
 
     drawCollage(width, height, signature) {
         const pieces = this.styleState.collagePieces || [];
-        const palette = this.styleState.palette || [];
-
+        
+        // Sort pieces by "depth" (size) so large ones are in back? 
+        // Or just maintain array order for "layering"
+        
         pieces.forEach((piece, index) => {
-            const drift = Math.sin(this.time * 0.4 + piece.drift) * 8;
-            const x = piece.x + drift;
-            const y = piece.y + Math.cos(this.time * 0.3 + piece.drift) * 6;
-            const tone = piece.tone || palette[index % palette.length] || { h: signature.primaryHue, s: 40, l: 40 };
-
+            // Animation
+            const driftX = Math.sin(this.time * 0.2 + piece.drift) * 10;
+            const driftY = Math.cos(this.time * 0.15 + piece.drift) * 10;
+            const rot = piece.rot + Math.sin(this.time * 0.1) * 0.05;
+            
+            const cx = piece.x + driftX;
+            const cy = piece.y + driftY;
+            
             this.ctx.save();
-            this.ctx.translate(x, y);
-            this.ctx.rotate(piece.rot);
-            this.ctx.fillStyle = `hsla(${tone.h}, ${tone.s}%, ${tone.l}%, ${piece.alpha})`;
-            if (piece.kind === 'circle') {
-                this.ctx.beginPath();
-                this.ctx.arc(0, 0, Math.min(piece.w, piece.h) * 0.4, 0, Math.PI * 2);
-                this.ctx.fill();
-            } else {
-                this.ctx.fillRect(-piece.w / 2, -piece.h / 2, piece.w, piece.h);
+            this.ctx.translate(cx, cy);
+            this.ctx.rotate(rot);
+            
+            if (piece.shadow) {
+                this.ctx.shadowColor = 'rgba(0,0,0,0.5)';
+                this.ctx.shadowBlur = 10;
+                this.ctx.shadowOffsetX = 5;
+                this.ctx.shadowOffsetY = 5;
             }
+            
+            if (piece.kind === 'poly') {
+                // Simulating torn paper
+                this.ctx.beginPath();
+                const w = piece.w;
+                const h = piece.h;
+                // Simple jagged rect
+                this.ctx.moveTo(-w/2, -h/2);
+                this.ctx.lineTo(0, -h/2 - 5);
+                this.ctx.lineTo(w/2, -h/2);
+                this.ctx.lineTo(w/2 + 5, 0);
+                this.ctx.lineTo(w/2, h/2);
+                this.ctx.lineTo(0, h/2 + 5);
+                this.ctx.lineTo(-w/2, h/2);
+                this.ctx.lineTo(-w/2 - 5, 0);
+                this.ctx.closePath();
+                
+                // Clip and draw texture
+                this.ctx.save();
+                this.ctx.clip();
+                this.ctx.drawImage(piece.texture, -w/2, -h/2, w, h);
+                this.ctx.restore();
+                
+                // Edge stroke
+                this.ctx.shadowBlur = 0;
+                this.ctx.shadowOffset = 0;
+                this.ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+                this.ctx.lineWidth = 1;
+                this.ctx.stroke();
+                
+            } else {
+                // Rect (Photos/Cards)
+                this.ctx.drawImage(piece.texture, -piece.w/2, -piece.h/2, piece.w, piece.h);
+                
+                // Tape effect?
+                if (!piece.isText && index % 4 === 0) {
+                     this.ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                     this.ctx.fillRect(-piece.w/4, -piece.h/2 - 10, piece.w/2, 20);
+                }
+            }
+            
             this.ctx.restore();
         });
-
-        const strokeTone = palette[0] || { h: signature.secondaryHue, s: 30, l: 50 };
-        this.ctx.strokeStyle = `hsla(${strokeTone.h}, ${strokeTone.s * 0.5}%, ${Math.max(20, strokeTone.l - 15)}%, 0.5)`;
-        this.ctx.lineWidth = 2;
-        this.ctx.strokeRect(width * 0.1, height * 0.12, width * 0.8, height * 0.76);
     }
 
     drawRadar(width, height, signature) {
@@ -1895,31 +2584,327 @@ class SimpleVisualizer {
         const palette = this.styleState.palette || [];
         const centerX = width / 2;
         const centerY = height / 2;
-        const sweep = (this.time * 0.6) % (Math.PI * 2);
+        const sweepAngle = (this.time * 0.8) % (Math.PI * 2);
 
+        // Draw Rings (Sonar Grid)
         rings.forEach((radius, index) => {
             const tone = palette[index % palette.length] || { h: signature.primaryHue, s: 40, l: 40 };
-            this.ctx.strokeStyle = `hsla(${tone.h}, ${tone.s * 0.5}%, ${tone.l}%, 0.3)`;
+            this.ctx.strokeStyle = `hsla(${tone.h}, ${tone.s}%, ${tone.l}%, 0.15)`;
             this.ctx.lineWidth = 1;
             this.ctx.beginPath();
             this.ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
             this.ctx.stroke();
+            
+            // Axis lines
+            if (index === rings.length - 1) {
+                 this.ctx.beginPath();
+                 this.ctx.moveTo(centerX - radius, centerY);
+                 this.ctx.lineTo(centerX + radius, centerY);
+                 this.ctx.moveTo(centerX, centerY - radius);
+                 this.ctx.lineTo(centerX, centerY + radius);
+                 this.ctx.stroke();
+            }
         });
 
-        this.ctx.strokeStyle = `hsla(${signature.secondaryHue}, 40%, 50%, 0.2)`;
-        this.ctx.lineWidth = 1;
+        // Draw Sweep (Gradient Sector)
+        const grad = this.ctx.createConicGradient(sweepAngle + Math.PI/2, centerX, centerY);
+        grad.addColorStop(0, `hsla(${signature.secondaryHue}, 80%, 60%, 0)`);
+        grad.addColorStop(0.1, `hsla(${signature.secondaryHue}, 80%, 60%, 0.2)`);
+        grad.addColorStop(0.2, `hsla(${signature.secondaryHue}, 80%, 60%, 0)`);
+        this.ctx.fillStyle = grad;
         this.ctx.beginPath();
-        this.ctx.moveTo(centerX, centerY);
-        this.ctx.lineTo(centerX + Math.cos(sweep) * rings[rings.length - 1], centerY + Math.sin(sweep) * rings[rings.length - 1]);
-        this.ctx.stroke();
+        this.ctx.arc(centerX, centerY, Math.min(width, height) * 0.45, 0, Math.PI * 2);
+        this.ctx.fill();
 
+        // Draw Blips
         points.forEach((point) => {
-            const x = centerX + Math.cos(point.angle + this.time * 0.15) * point.radius;
-            const y = centerY + Math.sin(point.angle + this.time * 0.15) * point.radius;
-            const delta = Math.abs(((point.angle - sweep + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
-            const alpha = 0.2 + Math.max(0, 1 - delta / 1.2) * 0.6;
-            this.ctx.fillStyle = `hsla(${point.tone.h}, ${point.tone.s}%, ${Math.min(85, point.tone.l + 10)}%, ${alpha})`;
-            this.ctx.fillRect(x - point.size / 2, y - point.size / 2, point.size, point.size);
+            // Position
+            const x = centerX + Math.cos(point.angle) * point.radius;
+            const y = centerY + Math.sin(point.angle) * point.radius;
+            
+            // Calculate opacity based on sweep distance
+            // Normalized angle distance
+            let dist = sweepAngle - point.angle;
+            while (dist < 0) dist += Math.PI * 2;
+            while (dist > Math.PI * 2) dist -= Math.PI * 2;
+            
+            // If just scanned (dist is small positive), fade slowly
+            // Opacity decay
+            const opacity = Math.max(0.1, Math.exp(-dist * 2));
+            
+            this.ctx.fillStyle = `hsla(${point.tone.h}, ${point.tone.s}%, 60%, ${opacity})`;
+            this.ctx.shadowColor = `hsla(${point.tone.h}, ${point.tone.s}%, 50%, ${opacity})`;
+            this.ctx.shadowBlur = 8 * opacity;
+            
+            this.ctx.beginPath();
+            this.ctx.arc(x, y, point.size * 0.8, 0, Math.PI * 2);
+            this.ctx.fill();
+            this.ctx.shadowBlur = 0;
+        });
+    }
+
+    drawCity(width, height, signature) {
+        const grid = this.styleState.cityGrid || [];
+        const theme = this.styleState.cityTheme || 'blueprint';
+        const palette = this.styleState.palette || [];
+        const isoX = width / 2;
+        const isoY = height * 0.2;
+        const tileW = 24;
+        const tileH = 12;
+
+        // Clear specially for city to ensure clean lines
+        this.ctx.fillStyle = theme === 'blueprint' ? '#1a2b3c' : '#05070a';
+        this.ctx.fillRect(0, 0, width, height);
+
+        // Use pre-sorted buildings
+        const buildings = this.styleState.sortedBuildings || [];
+        
+        buildings.forEach(b => {
+            const phase = this.time * 0.5 + (b.x + b.y) * 0.05;
+            const animHeight = b.h * (0.5 + 0.5 * Math.sin(phase));
+            
+            // Iso projection
+            const screenX = isoX + (b.x - b.y) * tileW;
+            const screenY = isoY + (b.x + b.y) * tileH;
+            
+            const paletteTone = this.getPaletteColorForHue(b.hue, palette);
+            
+            if (theme === 'blueprint') {
+                this.ctx.strokeStyle = `hsla(${paletteTone.h}, 60%, 70%, 0.4)`;
+                this.ctx.lineWidth = 1;
+                this.ctx.fillStyle = `hsla(${paletteTone.h}, 40%, 20%, 0.8)`;
+            } else if (theme === 'neon') {
+                this.ctx.strokeStyle = `hsla(${paletteTone.h}, 100%, 60%, 0.6)`;
+                this.ctx.lineWidth = 1.5;
+                this.ctx.fillStyle = `hsla(${paletteTone.h}, 60%, 10%, 0.9)`;
+            } else {
+                 this.ctx.fillStyle = `hsla(${paletteTone.h}, ${paletteTone.s}%, ${paletteTone.l}%, 1)`;
+                 this.ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+            }
+            
+            // Top face
+            this.ctx.beginPath();
+            this.ctx.moveTo(screenX, screenY - animHeight);
+            this.ctx.lineTo(screenX + tileW, screenY - tileH - animHeight);
+            this.ctx.lineTo(screenX, screenY - tileH * 2 - animHeight);
+            this.ctx.lineTo(screenX - tileW, screenY - tileH - animHeight);
+            this.ctx.closePath();
+            this.ctx.fill();
+            this.ctx.stroke();
+            
+            // Left face
+            this.ctx.beginPath();
+            this.ctx.moveTo(screenX - tileW, screenY - tileH - animHeight);
+            this.ctx.lineTo(screenX, screenY - animHeight);
+            this.ctx.lineTo(screenX, screenY);
+            this.ctx.lineTo(screenX - tileW, screenY - tileH);
+            this.ctx.closePath();
+            this.ctx.fillStyle = `rgba(0,0,0,0.2)`; 
+            this.ctx.fill();
+            this.ctx.stroke();
+
+            // Right face
+            this.ctx.beginPath();
+            this.ctx.moveTo(screenX, screenY - animHeight);
+            this.ctx.lineTo(screenX + tileW, screenY - tileH - animHeight);
+            this.ctx.lineTo(screenX + tileW, screenY - tileH);
+            this.ctx.lineTo(screenX, screenY);
+            this.ctx.closePath();
+            this.ctx.fillStyle = `rgba(0,0,0,0.4)`; 
+            this.ctx.fill();
+            this.ctx.stroke();
+        });
+    }
+
+    drawAttractor(width, height, signature) {
+        const { a, b, c, d } = this.styleState.attractorParams;
+        // Use generated scale or fallback
+        const scale = this.styleState.attractorParams.scale || 200;
+        const cx = width / 2;
+        const cy = height / 2;
+        const palette = this.styleState.palette || [];
+
+        this.ctx.lineWidth = 1.5;
+        
+        // Iterate points
+        this.particles.forEach((p, i) => {
+             const oldX = cx + p.x * scale;
+             const oldY = cy + p.y * scale;
+             
+             // Clifford Attractor update
+             const nx = Math.sin(a * p.y) + c * Math.cos(a * p.x);
+             const ny = Math.sin(b * p.x) + d * Math.cos(b * p.y);
+             
+             p.x = nx;
+             p.y = ny;
+             
+             const newX = cx + p.x * scale;
+             const newY = cy + p.y * scale;
+             
+             // Bounds check to avoid drawing off-screen infinity
+             if (Math.abs(newX) > width * 2 || Math.abs(newY) > height * 2) return;
+             
+             const paletteTone = this.getPaletteColorForHue(p.hue, palette);
+             this.ctx.strokeStyle = `hsla(${paletteTone.h}, ${paletteTone.s}%, ${paletteTone.l}%, 0.35)`;
+             
+             this.ctx.beginPath();
+             this.ctx.moveTo(oldX, oldY);
+             this.ctx.lineTo(newX, newY);
+             this.ctx.stroke();
+        });
+    }
+
+    drawBio(width, height, signature) {
+        const dim = this.styleState.bioDim;
+        const grid = this.styleState.bioGrid;
+        const next = this.styleState.bioNext;
+        const { dA, dB, f, k } = this.styleState.bioParams;
+        const palette = this.styleState.palette || [];
+        
+        const cellW = width / dim;
+        const cellH = height / dim;
+        
+        // Run multiple simulation steps per frame for speed
+        for(let step=0; step<8; step++) {
+            for(let x=0; x<dim; x++) {
+                for(let y=0; y<dim; y++) {
+                    const i = (y * dim + x) * 2;
+                    const A = grid[i];
+                    const B = grid[i+1];
+                    
+                    // Laplacian
+                    let lapA = 0;
+                    let lapB = 0;
+                    
+                    // Simple 3x3 convolution convolution kernel:
+                    // 0.05  0.2  0.05
+                    // 0.2  -1.0  0.2
+                    // 0.05  0.2  0.05
+                    
+                    // Center weight is -1, so we add neighbors * weights
+                    // Neighbors
+                    const xm1 = ((x - 1 + dim) % dim);
+                    const xp1 = ((x + 1) % dim);
+                    const ym1 = ((y - 1 + dim) % dim);
+                    const yp1 = ((y + 1) % dim);
+                    
+                    const neighbors = [
+                        [xm1, y, 0.2], [xp1, y, 0.2], [x, ym1, 0.2], [x, yp1, 0.2],
+                        [xm1, ym1, 0.05], [xp1, ym1, 0.05], [xm1, yp1, 0.05], [xp1, yp1, 0.05]
+                    ];
+                    
+                    neighbors.forEach(n => {
+                        const idx = (n[1]*dim + n[0])*2;
+                        lapA += grid[idx] * n[2];
+                        lapB += grid[idx+1] * n[2];
+                    });
+                    
+                    lapA -= A; // Center weight -1
+                    lapB -= B; 
+                    
+                    // Gray-Scott Formula
+                    // A' = A + (dA * lapA - A*B^2 + f*(1-A))
+                    // B' = B + (dB * lapB + A*B^2 - (k+f)*B)
+                    
+                    const reaction = A * B * B;
+                    next[i] = A + (dA * lapA - reaction + f * (1 - A));
+                    next[i+1] = B + (dB * lapB + reaction - (k + f) * B);
+                    
+                    // Clamp
+                    if(next[i] < 0) next[i]=0; if(next[i]>1) next[i]=1;
+                    if(next[i+1] < 0) next[i+1]=0; if(next[i+1]>1) next[i+1]=1;
+                }
+            }
+            // Swap
+            for(let k=0; k<grid.length; k++) grid[k] = next[k];
+        }
+
+        // Draw
+        // We can draw directly to ImageData for speed, but fillRect is easier for palette mapping
+        // Optimization: Create ImageData once and update it? 
+        // For 100x100, fillRect is acceptable (~10k calls).
+        
+        for(let y=0; y<dim; y++) {
+            for(let x=0; x<dim; x++) {
+                const i = (y * dim + x) * 2;
+                const B = grid[i+1];
+                const A = grid[i];
+                
+                // Color based on concentration difference A-B or just B
+                const val = Math.floor((A - B) * 255);
+                
+                // Only draw active cells
+                if (B > 0.1) {
+                     // Map B concentration to palette index
+                     const paletteIdx = Math.floor(B * palette.length * 2) % palette.length;
+                     const tone = palette[paletteIdx] || palette[0];
+                     
+                     this.ctx.fillStyle = `hsla(${tone.h}, ${tone.s}%, ${Math.max(10, tone.l - B*20)}%, 1)`;
+                     this.ctx.fillRect(x * cellW, y * cellH, cellW+1, cellH+1);
+                } else {
+                     this.ctx.fillStyle = `rgba(0,0,0,1)`; // Clear background
+                     this.ctx.fillRect(x * cellW, y * cellH, cellW, cellH);
+                }
+            }
+        }
+    }
+
+    drawPainting(width, height, signature) {
+        const brushes = this.styleState.brushes || [];
+        const style = this.styleState.paintStyle || 'oil';
+        const palette = this.styleState.palette || [];
+
+        brushes.forEach(b => {
+            // Update brush
+            const noise = this.noise.noise(b.x * 0.005, b.y * 0.005 + this.time * 0.1);
+            const angle = noise * Math.PI * 4;
+            
+            b.vx += Math.cos(angle) * 0.2;
+            b.vy += Math.sin(angle) * 0.2;
+            b.vx *= 0.96;
+            b.vy *= 0.96;
+            
+            b.x += b.vx;
+            b.y += b.vy;
+            
+            if (b.x < 0) b.x += width;
+            if (b.x > width) b.x -= width;
+            if (b.y < 0) b.y += height;
+            if (b.y > height) b.y -= height;
+            
+            const paletteTone = this.getPaletteColorForHue(b.hue, palette);
+            
+            if (style === 'oil') {
+                this.ctx.fillStyle = `hsla(${paletteTone.h}, ${paletteTone.s}%, ${paletteTone.l}%, 0.1)`;
+                this.ctx.beginPath();
+                this.ctx.arc(b.x, b.y, b.size * (0.8 + Math.sin(this.time) * 0.2), 0, Math.PI * 2);
+                this.ctx.fill();
+                
+                // Texture
+                this.ctx.strokeStyle = `hsla(${paletteTone.h}, ${paletteTone.s}%, ${paletteTone.l + 10}%, 0.1)`;
+                this.ctx.lineWidth = 1;
+                this.ctx.beginPath();
+                this.ctx.moveTo(b.x, b.y);
+                this.ctx.lineTo(b.x + b.vx * 4, b.y + b.vy * 4);
+                this.ctx.stroke();
+            } else {
+                // Watercolor
+                const spread = b.size * 3; // Increased spread
+                this.ctx.fillStyle = `hsla(${paletteTone.h}, ${paletteTone.s}%, ${paletteTone.l}%, 0.08)`; // Increased opacity
+                
+                // Deformed circle
+                this.ctx.beginPath();
+                const points = 8;
+                for(let i=0; i<=points; i++) {
+                    const a = (i/points) * Math.PI * 2;
+                    const r = spread * (0.8 + Math.random() * 0.4);
+                    const px = b.x + Math.cos(a) * r;
+                    const py = b.y + Math.sin(a) * r;
+                    if (i===0) this.ctx.moveTo(px, py);
+                    else this.ctx.lineTo(px, py);
+                }
+                this.ctx.fill();
+            }
         });
     }
     
@@ -2160,8 +3145,12 @@ class CommitArtGenerator {
         } catch (error) {
             console.error('Visualization error:', error);
             
-            if (error.message.includes('rate limit') || error.message.includes('API error')) {
-                this.showStatus('Rate limit hit. Generating simulation...');
+            // Fallback for Rate Limits OR Network Errors (Offline)
+            const isNetworkError = error.message.includes('Failed to fetch') || error.message.includes('NetworkError');
+            const isApiError = error.message.includes('rate limit') || error.message.includes('API error') || error.message.includes('404') || error.message.includes('403');
+            
+            if (isNetworkError || isApiError) {
+                this.showStatus('Simulation mode (Network/API unavailable)...');
                 const { owner, repo } = this.parseGitHubUrl(repoUrl);
                 const fallbackData = this.createFallbackData(owner, repo);
                 

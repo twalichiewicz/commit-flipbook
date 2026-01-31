@@ -9,75 +9,50 @@ Every algorithm must be **seeded** by repository data.
 
 ---
 
-## 1. Noise Functions: "Code Topography"
-**Concept:** Visualize the repository as a landscape. High "peaks" represent complex code or high activity; "valleys" are stable regions.
-**Method:** Perlin/Simplex Noise (2D).
-**Implementation:**
-- **Algorithm:** Port a lightweight, seeded 2D Perlin Noise function to vanilla JS.
-- **Mapping:**
-    - `x, y` coordinates -> Noise value (0-1).
-    - `Noise Scale` -> Proportional to `total_commits` (more commits = rougher terrain).
-    - `Color Gradient` -> Mapped to commit authors or dominant language colors.
-- **Visuals:** Flow fields or isolines (contour map) drawn based on noise values.
+## Implemented Systems
 
-## 2. Fractals & Recursion: "The Directory Tree"
-**Concept:** A literal or abstract tree structure representing the growth of the codebase.
-**Method:** Recursive Branching (L-Systems).
-**Implementation:**
-- **Algorithm:** Recursive function `drawBranch(length, angle, depth)`.
-- **Mapping:**
-    - `Trunk` -> Initial commit.
-    - `Branches` -> Splits based on major "merge" commits or time intervals.
-    - `Branch Angle` -> Determined by commit hash characters.
-    - `Leaves` -> Individual files or recent commits.
-- **Emergence:** Complex organic structures emerge from simple branching rules defined by the project's history.
+### 1. Noise Functions: "Code Topography"
+**Concept:** Visualize the repository as a landscape. High "peaks" represent complex code or high activity.
+**Implemented:**
+- `SeededPerlinNoise` class for deterministic 2D noise.
+- Used in `flow`, `nebula`, `mosaic`, `paint` styles.
 
-## 3. Cellular Automata: "Living History"
-**Concept:** A grid where the state of the code evolves biologically.
-**Method:** Conway's Game of Life or Cyclic Cellular Automaton.
-**Implementation:**
-- **Grid:** A canvas pixel grid (e.g., 100x100).
-- **Initial State:** Seeded by the binary representation of the first 100 commit hashes.
-- **Rules:**
-    - Cells live/die based on neighbors.
-    - **Modification:** Introduce "mutation" events triggered by actual commit timestamps in the animation loop.
-- **Visuals:** A shifting, pixelated mosaic that stabilizes or "gliders" depending on repo activity.
+### 2. Geometric Construction: "Isometric City"
+**Concept:** Treat the repo as a blueprint. Files are rooms, commits are structural changes.
+**Implemented:** `drawCity` method.
+- **Visuals:** Isometric projection of blocks.
+- **Data Mapping:**
+    - `X, Y`: Hashed from commit SHA (Location).
+    - `Height`: Logarithmic scale of commit lines changed (Size).
+    - `Color`: Hashed from Author Name (Ownership).
+- **Themes:** 'Blueprint', 'Neon', 'Sunset'.
 
-## 4. Geometric Algorithms: "Contributor Mosaic"
-**Concept:** Partitioning the screen into territories owned by different contributors.
-**Method:** Voronoi Diagrams / Delaunay Triangulation.
-**Implementation:**
-- **Sites (Points):** Each active contributor is a "site" on the canvas.
-    - Position: Deterministic hash of their username.
-    - Weight: Number of commits (affects the size of their cell in weighted Voronoi).
-- **Algorithm:** Compute Euclidean distance from every pixel to the nearest site to determine color.
-- **Animation:** Sites slowly drift over time (representing changing influence), reshaping the boundaries.
-
-## 5. Agent-Based Systems: "The Swarm"
-**Concept:** Particles that exhibit complex group behavior.
-**Method:** Boids (Flocking Simulation).
-**Implementation:**
-- **Agents:** Commits or files represented as boids.
-- **Forces:**
-    - **Separation:** Don't crowd (code modularity).
-    - **Alignment:** Steer towards average heading (team cohesion).
-    - **Cohesion:** Steer towards center of mass (project goal).
-- **Mapping:**
-    - "Predators" (Bugs/Issues) could chase the swarm, causing scattering.
-    - "Attractors" (Milestones/Releases) pull the swarm together.
+### 3. Abstract Expressionism: "Painterly"
+**Concept:** Code as a living painting. Commits are brush strokes.
+**Implemented:** `drawPainting` method.
+- **Behavior:** Accumulative canvas (does not clear).
+- **Styles:** 'Oil' (dense, textured), 'Watercolor' (transparent, spreading).
+- **Data Mapping:**
+    - `Brush Size`: Commit complexity.
+    - `Color`: Author identity.
+    - `Motion`: Driven by Perlin flow fields.
 
 ---
 
-## Roadmap
+## Roadmap & Future Concepts
 
-### Phase 1: Core Utilities (Immediate)
-- [ ] Implement `SeededPerlinNoise` class.
-- [ ] Implement `Voronoi` helper (simple distance check version for GPU-less performance).
+### Phase 1: Core Utilities (Done)
+- [x] Implement `SeededPerlinNoise` class.
+- [x] Implement `Voronoi` / `Mosaic` helper.
 
-### Phase 2: New Styles (Next)
-- [ ] **Style 'Topography':** Uses Perlin noise for flow fields.
-- [ ] **Style 'Mosaic':** Uses Voronoi for contributor visualization.
+### Phase 2: Advanced Styles (In Progress)
+- [x] **Style 'City':** Isometric architectural visualization.
+- [x] **Style 'Paint':** Accumulative abstract art.
+- [ ] **Style 'Loom':** Weaving threads (Textile art).
 
-### Phase 3: Advanced Styles (Future)
-- [ ] **Style 'Tree':** Recursive fractal generator.
-- [ ] **Style 'Life':** Cellular automata grid.
+### Phase 3: "The Swarm" (Future)
+- [ ] **Style 'Boids':** Flocking simulation where commits chase bugs.
+- [ ] **Interactivity:** Mouse interaction to scatter/attract particles.
+
+### Phase 4: Audio-Visual
+- [ ] **Sonification:** Map commit frequency to audio frequencies? (Potential WebAudio API).
