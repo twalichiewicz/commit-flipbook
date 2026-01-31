@@ -227,8 +227,9 @@ class SimpleVisualizer {
     initializeState(signature, repoData) {
         this.particles = [];
         const { commits } = repoData;
-        const width = parseInt(this.canvas.style.width);
-        const height = parseInt(this.canvas.style.height);
+        const dpr = window.devicePixelRatio || 1;
+        const width = this.canvas.width / dpr;
+        const height = this.canvas.height / dpr;
         
         const activeCommits = (commits || []).slice(0, 150);
         if (activeCommits.length === 0) return;
@@ -251,6 +252,11 @@ class SimpleVisualizer {
         activeCommits.forEach((commit, i) => {
             const p = this.mapCommitToParticle(commit, i, activeCommits.length, width, height, timeRange);
             if (i === 0) console.log('First particle:', p);
+            
+            if (isNaN(p.x) || isNaN(p.y)) {
+                console.error('Invalid particle:', p);
+                return;
+            }
             this.particles.push(p);
         });
 
@@ -307,8 +313,9 @@ class SimpleVisualizer {
     }
     
     clear(signature) {
-        const width = parseInt(this.canvas.style.width);
-        const height = parseInt(this.canvas.style.height);
+        const dpr = window.devicePixelRatio || 1;
+        const width = this.canvas.width / dpr;
+        const height = this.canvas.height / dpr;
         
         // Use a very dark background with slight tint
         this.ctx.fillStyle = `hsla(${signature.primaryHue}, 30%, 5%, 0.2)`; // Trail effect
@@ -320,8 +327,9 @@ class SimpleVisualizer {
     
     drawVisualization(signature, repoData) {
         if (Math.random() < 0.01) console.log('Drawing particles:', this.particles.length);
-        const width = parseInt(this.canvas.style.width);
-        const height = parseInt(this.canvas.style.height);
+        const dpr = window.devicePixelRatio || 1;
+        const width = this.canvas.width / dpr;
+        const height = this.canvas.height / dpr;
         
         this.ctx.globalCompositeOperation = 'screen'; // Make things glowy and additive
         
