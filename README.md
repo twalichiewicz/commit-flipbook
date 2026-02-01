@@ -1,4 +1,4 @@
-# Commit Flipbook
+# Commit Flipbook (alpha)
 
 Transform any GitHub repository into beautiful, deterministic generative art by visualizing its commit history.
 
